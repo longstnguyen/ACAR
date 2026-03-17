@@ -9,7 +9,7 @@ from ranking.reciprocal_rank_fusion import fuse_results
 from text_retrieval.jaccard_retriever import JaccardSimilarityRetriever
 from graph_retrieval.lsp import LsptRetriever
 
-BASE_DIR = os.getenv("ACAR_BASE_DIR", "ReccEval/Source_Code")
+BASE_DIR = os.getenv("ACAR_BASE_DIR", "datasets/ReccEval/Source_Code")
 
 
 class ContextMixer:

@@ -2,7 +2,6 @@ from context_mixer import ContextMixer
 from schema.common import Document, Position
 import asyncio
 import os
-import json
 import jsonlines
 from tqdm import tqdm
 import argparse
@@ -13,8 +12,10 @@ prompt_extractor = CodeQwen25PromptExtractor()
 
 def process_single_data(base_dir, data):
     language_id = "python"
+    file_path = os.path.join(base_dir, *data["metadata"]["fpath_tuple"])
+
     document = Document(
-        uri=base_dir +  os.path.join(*data["metadata"]["fpath_tuple"]), 
+        uri=file_path,
         language_id=language_id, 
         text=data["prefix"] + data["suffix"], 
         prefix=data["prefix"], 

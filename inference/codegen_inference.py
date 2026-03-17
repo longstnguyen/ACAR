@@ -76,13 +76,9 @@ class CodeGen:
         assert len(gen_text) == len(prompts)
         new_lines = []
         for line, gen in zip(lines, gen_text):
-            new_lines.append(
-                {
-                    "prompt": line["prompt"],
-                    "metadata": line["metadata"],
-                    "choices": [{"text": gen}],
-                }
-            )
+            output_line = dict(line)
+            output_line["choices"] = [{"text": gen}]
+            new_lines.append(output_line)
         Tools.dump_jsonl(
             new_lines,
             file.replace(".jsonl", f'_{self.model_name.split("/")[-1]}.jsonl'),
@@ -90,7 +86,7 @@ class CodeGen:
 
 
 if __name__ == "__main__":
-    file_path = "result/acar-rg-one-gram-ws-20-ss-2.jsonl"
+    file_path = "result/prompts.jsonl"
     tiny_codegen = "Salesforce/codegen-350M-mono"
 
     cg = CodeGen(tiny_codegen, batch_size=8)

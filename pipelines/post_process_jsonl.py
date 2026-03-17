@@ -9,9 +9,10 @@ from context.handle_current_context import get_current_doc_context
 def process_single_data(base_dir, data):
 
     language_id = "python"
+    file_path = os.path.join(base_dir, *data["metadata"]["fpath_tuple"])
 
     document = Document(
-        uri=base_dir +  os.path.join(*data["metadata"]["fpath_tuple"]), 
+        uri=file_path,
         language_id=language_id, 
         text=data["prefix"] + data["suffix"], 
         prefix=data["prefix"], 
@@ -50,20 +51,21 @@ def process_single_data(base_dir, data):
 def process_jsonl_file(base_dir, input_file, output_file):
     results = []
 
-    dataset = []
-    with jsonlines.open(input_file) as reader:
-        for data in reader:
-            dataset.append(data)
-    
     # Read input JSONL file
     with jsonlines.open(input_file) as reader:
         # Wrap with tqdm for progress bar
-        for index, data in enumerate(tqdm(reader, desc="Processing data")):
+        for data in tqdm(reader, desc="Processing data"):
             try:
+                if "prefix" not in data or "suffix" not in data:
+                    raise KeyError(
+                        "Missing required fields 'prefix'/'suffix'. "
+                        "Use an inference output that preserves source records."
+                    )
+
                 new_data = {
                     **data,
-                    'prefix': dataset[index]['prefix'],
-                    'suffix': dataset[index]['suffix'],
+                    "prefix": data["prefix"],
+                    "suffix": data["suffix"],
                 }
                 result = process_single_data(base_dir, new_data)
                 results.append(result)

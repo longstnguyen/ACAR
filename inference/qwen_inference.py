@@ -116,13 +116,9 @@ class QwenInference:
                     top_p=top_p,
                 )
 
-                new_lines.append(
-                    {
-                        "prompt": line["prompt"],
-                        "metadata": line.get("metadata", {}),
-                        "choices": [{"text": generated_text}],
-                    }
-                )
+                output_line = dict(line)
+                output_line["choices"] = [{"text": generated_text}]
+                new_lines.append(output_line)
 
                 # Log progress periodically
                 if (i + 1) % 10 == 0:
@@ -131,13 +127,9 @@ class QwenInference:
             except Exception as e:
                 print(f"Error processing record {i}: {str(e)}")
                 # Add empty result to maintain order
-                new_lines.append(
-                    {
-                        "prompt": line["prompt"],
-                        "metadata": line.get("metadata", {}),
-                        "choices": [{"text": "ERROR: " + str(e)}],
-                    }
-                )
+                output_line = dict(line)
+                output_line["choices"] = [{"text": "ERROR: " + str(e)}]
+                new_lines.append(output_line)
 
         print(f"Generated {len(new_lines)} samples")
 
@@ -150,7 +142,7 @@ class QwenInference:
 
 
 def main():
-    file_path = os.getenv("ACAR_QWEN_INPUT", "result/input.jsonl")
+    file_path = os.getenv("ACAR_QWEN_INPUT", "result/prompts.jsonl")
 
     print("file_path", file_path)
 

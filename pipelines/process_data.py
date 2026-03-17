@@ -178,7 +178,7 @@ def load_dataset(task: Union[str, List[str]] = ["block", "control", "api"]):
 
 if __name__ == "__main__":
     # get_all_repositories()
-    base_path = "ReccEval/Source_Code"
-    input_file = "ReccEval/metadata.jsonl"
-    output_file = "dataset/metadata.jsonl"
+    base_path = "datasets/ReccEval/Source_Code"
+    input_file = "datasets/ReccEval/metadata.jsonl"
+    output_file = "result/metadata.jsonl"
     convert_dataset_prefix_and_suffix(base_path, input_file, output_file)

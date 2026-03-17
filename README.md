@@ -127,6 +127,24 @@ pip install -r requirements.txt
 
 ---
 
+## Dataset Setup
+
+You can bootstrap all benchmark datasets with one command:
+
+```bash
+bash scripts/download_datasets.sh
+```
+
+This script downloads and extracts data into:
+
+- `datasets/RepoEval`
+- `datasets/ReccEval` (includes `Source_Code/` and `metadata.jsonl`)
+- `datasets/CrossCodeEval`
+
+After successful extraction, downloaded archive files are removed automatically.
+
+---
+
 ## Troubleshooting
 
 If you are using the structural/LSP retrieval components, your environment may need additional tooling beyond Python packages.
@@ -168,8 +186,8 @@ This step reads the dataset JSONL, retrieves repository context, and writes a pr
 
 ```bash
 python -m scripts.build_prompts \
-  --base_dir ReccEval/Source_Code \
-  --input ReccEval/metadata.jsonl \
+  --base_dir datasets/ReccEval/Source_Code \
+  --input datasets/ReccEval/metadata.jsonl \
   --output result/prompts.jsonl
 ```
 
@@ -188,7 +206,7 @@ Post-processing re-parses model outputs and applies syntax-aware truncation/clea
 
 ```bash
 python -m scripts.post_process_jsonl \
-  --base_dir ReccEval/Source_Code \
+  --base_dir datasets/ReccEval/Source_Code \
   --input result/prompts_Qwen2.5-Coder-0.5B.jsonl \
   --output result/prompts_Qwen2.5-Coder-0.5B_post.jsonl
 ```
@@ -275,7 +293,7 @@ asyncio.run(demo())
 
 Environment variables are optional, but they are convenient for scripting and reproducible runs.
 
-- `ACAR_BASE_DIR`: default retrieval base directory (default: `ReccEval/Source_Code`).
+- `ACAR_BASE_DIR`: default retrieval base directory (default: `datasets/ReccEval/Source_Code`).
 - `ACAR_QWEN_INPUT`: input JSONL path for `inference/qwen_inference.py`.
 - `ACAR_SAFIM_INPUT`: SAFIM input JSONL path.
 - `ACAR_SAFIM_OUTPUT`: SAFIM post-processed output JSONL path.

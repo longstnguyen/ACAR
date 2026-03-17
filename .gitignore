@@ -1,13 +1,14 @@
-ReccEval/*
-dataset/*
-datasets/*
-result/*
-.DS_Store
-.vscode
-.cursor
-.cursorrules
+# Dataset and generated artifacts
+datasets/
+result/
 
-__pycache__
+# Editor and OS files
+.vscode/
+.cursor/
+.cursorrules
+.DS_Store
+
+# Python caches and virtual environments
 **/__pycache__/
 *.py[cod]
 .venv/

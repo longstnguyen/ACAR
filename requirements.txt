@@ -12,4 +12,3 @@ pandas
 fsspec
 datasets==2.18.0
 tree_sitter_languages==1.10.2
-argparse
