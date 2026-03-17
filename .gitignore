@@ -1,0 +1,13 @@
+ReccEval/*
+dataset/*
+datasets/*
+result/*
+.DS_Store
+.vscode
+.cursor
+.cursorrules
+
+__pycache__
+**/__pycache__/
+*.py[cod]
+.venv/
