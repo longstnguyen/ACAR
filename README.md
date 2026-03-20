@@ -331,7 +331,7 @@ To keep runs comparable across machines and over time, it is helpful to record a
 
 ## Citation
 
-If you use ACAR in your research, please cite the paper below. If you extend the pipeline or use it as a baseline, citing it in accompanying write-ups helps others trace methodology and experimental settings.
+If you use ACAR in your research, please cite the paper below.
 
 ```bibtex
 @inproceedings{acar2026,
