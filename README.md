@@ -65,10 +65,9 @@ For day-to-day use, the repository ships thin CLI wrappers that call into the pi
 
 ACAR follows a compact repository-level FIM pipeline that is both **prompt-efficient** and **structurally faithful**. The framework is divided into an indexing phase (performed once per repository snapshot) and an inference phase (performed per completion query). The figure below presents the overall ACAR framework.
 
-<img width="100%" alt="acar_framework" src="https://github.com/user-attachments/assets/99470838-165c-4dc1-abd9-8e661a647285" />
+<img width="100%" alt="ACAR framework overview" src="assets/acar_framework.png" />
 
 The four stages below are the mental model to keep in mind when reading the codebase.
-ACAR framework overview" src="assets/acar_framework.png
 **1. Repository pre-processing**
 
 The repository is indexed into two complementary retrieval spaces. A lexical corpus is built by sliding-window segmentation of repository files into reusable context chunks. A structural graph is built using Tree-sitter for hierarchical AST extraction and LSP for lightweight symbol resolution, linking definitions, references, and cross-file dependencies.
@@ -312,11 +311,11 @@ Representative scores include **42.98 EM / 72.46 ES** on ReccEval (Qwen2.5-Coder
 
 The table below summarizes RepoEval results across baselines—including DraCo [2], CoCoMIC [4], RepoCoder [1], GraphCoder [5], and Repoformer [6]—under Qwen2.5-Coder backbones.
 
-<img width="100%" alt="RepoEval results" src="https://github.com/user-attachments/assets/9662b8f7-abcb-4c1d-ade7-61230f776596" />
+<img width="100%" alt="RepoEval results" src="assets/results_repoeval.png" />
 
 The next table reports CrossCodeEval performance broken down by programming language, showing ACAR against the same family of baselines.
 
-<img width="100%" alt="CrossCodeEval results by language" src="https://github.com/user-attachments/assets/1f8a06f6-bab1-452e-bc60-3b33eefc820b" />
+<img width="100%" alt="CrossCodeEval results by language" src="assets/results_crosscodeeval.png" />
 
 ---
 
@@ -328,11 +327,11 @@ To keep runs comparable across machines and over time, it is helpful to record a
 - Record model checkpoint names and decoding seeds per run.
 - Ensure language-server setup is consistent across machines when evaluating graph retrieval, as symbol resolution can vary across environments.
 
----assets/results_repoeval.png
+---
 
 ## Citation
 
-If you use ACAR in your research, please cite the paper below. assets/results_crosscodeeval.pngrite-ups helps others trace methodology and experimental settings.
+If you use ACAR in your research, please cite the paper below. If you extend the pipeline or use it as a baseline, citing it in accompanying write-ups helps others trace methodology and experimental settings.
 
 ```bibtex
 @inproceedings{acar2026,
