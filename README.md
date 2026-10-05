@@ -372,3 +372,7 @@ This repository is intended for research use under the MIT License.
 [5] Wei Liu, Ailun Yu, Daoguang Zan, Bo Shen, Wei Zhang, Haiyan Zhao, Zhi Jin, and Qianxiang Wang. *GraphCoder: Enhancing Repository-Level Code Completion via Coarse-to-fine Retrieval Based on Code Context Graph*. ASE, 2024.
 
 [6] Di Wu, Wasi Uddin Ahmad, Dejiao Zhang, Murali Krishna Ramanathan, and Xiaofei Ma. *Repoformer: Selective Retrieval for Repository-Level Code Completion*. ICML, 2024.
+
+## License
+
+This project is released under the [MIT License](LICENSE).
