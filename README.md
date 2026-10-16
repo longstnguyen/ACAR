@@ -1,209 +1,191 @@
-# ACAR: Adaptive Context-Aware Retrieval for Repository-Level Code Completion
+<div align="center">
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](#installation)
-[![Status](https://img.shields.io/badge/Research-Active-success.svg)](#)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
+<img src="docs/assets/header.svg" alt="ACAR — Fast and Focused. A pixel cat collects repository context beside a code editor." width="100%">
 
-ACAR is a repository-level Fill-in-the-Middle (FIM) framework for code completion. It addresses a core limitation of existing approaches: most completion pipelines are file-centric, yet in real repositories the evidence needed to produce a correct completion is often distributed across multiple files and connected through structural dependencies. ACAR closes this gap by combining lexical retrieval, AST- and LSP-derived structural retrieval, line-level reciprocal-rank fusion, and syntax-aware post-processing into a single coherent pipeline that improves completion quality under multi-file context.
+### Interactive Repository-Level Fill-in-the-Middle Code Completion<br>with Hybrid Structural Retrieval
 
-In practice, this repository gives you an end-to-end workflow: build retrieval-augmented FIM prompts, run model inference, then refine completions into structurally consistent insertions. The design is intentionally prompt-efficient and usable for both research and benchmarking.
+![Venue](https://img.shields.io/badge/EMNLP%202026-Main%20Conference%20%C2%B7%20Oral-8B75B5?style=flat-square)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-527D70?style=flat-square&logo=python&logoColor=white)](#quickstart)
+[![License](https://img.shields.io/badge/Code-MIT-699D83?style=flat-square)](LICENSE)
+[![Retrieval](https://img.shields.io/badge/Retrieval-Lexical%20%2B%20Structural-927BA9?style=flat-square)](#method)
 
----
+**[Overview](#overview) · [Method](#method) · [Quickstart](#quickstart) · [Configuration](#configuration) · [Datasets](#datasets) · [Evaluation](#evaluation) · [Results](#results) · [Findings](#findings) · [Adapt & Extend](#adapting-acar) · [Citation](#citation)**
 
-## Why ACAR?
+Long S. T. Nguyen<sup>1,2,3</sup> · Dat T. Huynh<sup>1,2</sup> · Quynh T. N. Vo<sup>1,2,3</sup> · Dang Le<sup>4</sup><br>
+Cong-Duy Nguyen<sup>3</sup> · Anh Tuan Luu<sup>5,3</sup> · Anh Nguyen-Duc<sup>6</sup> · Tho T. Quan<sup>1,2</sup>
 
-If you have ever seen a completion look "locally plausible" but fail because the right definition lives in another file, that is the gap ACAR is built to address. Relevant evidence is rarely confined to a single file—it is distributed across modules, connected by imports, symbol references, and cross-file dependencies.
+<sub><sup>1</sup> URA Research Group, Ho Chi Minh City University of Technology (HCMUT), Vietnam<br>
+<sup>2</sup> Vietnam National University Ho Chi Minh City, Vietnam · <sup>3</sup> Center for AI Research (CAIR), VinUniversity, Vietnam<br>
+<sup>4</sup> Japan Advanced Institute of Science and Technology (JAIST), Japan<br>
+<sup>5</sup> Nanyang Technological University (NTU), Singapore · <sup>6</sup> University of South-Eastern Norway (USN), Norway</sub>
 
-ACAR is designed around the observation that "good context" is rarely one thing. Sometimes the strongest signal is lexical overlap with a nearby code pattern; other times it is structural connectivity—definitions, references, and symbol neighborhoods that may be lexically distant. In practice, you want both: combined, ranked, and formatted into prompts that a FIM model can reliably consume.
+</div>
 
-To achieve this, ACAR combines four complementary signals into a single lightweight pipeline:
+## Overview
 
-- **Lexical retrieval** for high-overlap local patterns and recurring implementation motifs.
-- **Structural retrieval** from AST and LSP relations for cross-file, symbol-linked evidence.
-- **Line-level fusion (RRF)** to unify lexical and structural candidates into a shared ranking space.
-- **Syntax-aware refinement** to reduce malformed or misaligned insertions after generation.
+**ACAR retrieves repository evidence for the code missing between a prefix and a suffix.** Lexical retrieval finds recurring implementations; structural retrieval follows symbols across files. The framework combines their evidence before generation and refines the resulting insertion using the surrounding syntax.
 
----
+The paper evaluates RepoEval, ReccEval, and CrossCodeEval with five Qwen and DeepSeek backbones. At Qwen2.5-Coder-3B, ACAR reaches 42.98 Exact Match on ReccEval and 32.86 on CrossCodeEval. Reported warm-cache overhead is 87–95 ms across the three benchmarks, excluding model decoding.
 
-## Core Features
+This repository contains retrieval modules, FIM prompt templates, inference helpers, and syntax-aware post-processing. Start with the small CPU example, then use the JSONL workflow for your own Python repositories.
 
-ACAR is organized as small, composable modules—retrieval, fusion, prompt building, and post-processing—with scripted entrypoints for common workflows. If you only need one piece (for example, graph retrieval or truncation), you can use the modules directly without running the full pipeline.
+## Method
 
-### Hybrid Retrieval
+<p align="center">
+<a href="docs/assets/architecture.pdf"><img src="docs/assets/architecture.png" alt="ACAR framework: repository indexing, lexical and structural retrieval, line-level fusion, FIM generation, and syntax-aware post-processing." width="100%"></a>
+</p>
 
-The retriever is intentionally hybrid, with one branch capturing near-duplicate patterns and the other following symbol structure across files. This design ensures that neither purely lexical nor purely structural signals dominate the final context.
+| Stage | Purpose | Entry point |
+| :--- | :--- | :--- |
+| Lexical retrieval | Rank sliding windows by Jaccard similarity to the prefix. | [`JaccardSimilarityRetriever`](text_retrieval/jaccard_retriever.py) |
+| Structural retrieval | Resolve nearby identifiers and follow symbol definitions. | [`LsptRetriever`](graph_retrieval/lsp.py) |
+| Context fusion | Combine evidence using shared source-line identities. | [`ContextMixer`](context_mixer.py), [`fuse_results`](ranking/reciprocal_rank_fusion.py) |
+| FIM generation | Serialize retrieved context, filename, prefix, and suffix. | [`CodeQwen25PromptExtractor`](prompt/fim_utils.py), [`QwenInference`](inference/qwen_inference.py) |
+| Refinement | Truncate the insertion using AST boundaries and trim overlap. | [`parse_and_truncate_completion`](post_processing/parse_and_truncate_completion.py), [`process_completion`](post_processing/process_inline_completion.py) |
 
-- Sliding-window text retrieval using Jaccard similarity over token sets.
-- Graph-based retrieval from symbol, definition, and reference context via Tree-sitter AST and LSP.
-- Unified ranking across both sources via Reciprocal Rank Fusion (RRF).
-
-### FIM Prompt Construction
-
-Once context is retrieved and ranked, ACAR serializes it into a format that FIM-capable backbones can consume reliably. The prompt design is model-agnostic, with thin adapters for backbone-specific templates.
-
-- Converts fused snippets into model-ready infilling prompts in ranked order.
-- Keeps retrieval context budget-aware, prepending evidence before the local prefix–middle–suffix target.
-
-### Structural Post-Processing
-
-Generation alone is insufficient for structural correctness. ACAR adds an AST-guided cleanup step so the inserted code remains aligned with the surrounding prefix and suffix—one of the most impactful components in the pipeline.
-
-- AST-guided parse-and-truncate using line-aligned ancestor selection.
-- Overlap-aware insertion cleanup against the existing suffix and prefix.
-- Bracket repair before truncation to handle common delimiter issues.
-
-### Research-Friendly Workflow
-
-For day-to-day use, the repository ships thin CLI wrappers that call into the pipeline implementations, with environment-variable support for reproducible runs.
-
-- Scripted entrypoints for prompt building and post-processing.
-- Environment-variable support for reproducible pipeline execution.
-
----
-
-## Method Overview
-
-ACAR follows a compact repository-level FIM pipeline that is both **prompt-efficient** and **structurally faithful**. The framework is divided into an indexing phase (performed once per repository snapshot) and an inference phase (performed per completion query). The figure below presents the overall ACAR framework.
-
-<img width="100%" alt="ACAR framework overview" src="assets/acar_framework.png" />
-
-The four stages below are the mental model to keep in mind when reading the codebase.
-**1. Repository pre-processing**
-
-The repository is indexed into two complementary retrieval spaces. A lexical corpus is built by sliding-window segmentation of repository files into reusable context chunks. A structural graph is built using Tree-sitter for hierarchical AST extraction and LSP for lightweight symbol resolution, linking definitions, references, and cross-file dependencies.
-
-**2. Context retrieval + line-level fusion**
-
-At inference time, ACAR queries both retrieval spaces independently. The lexical branch ranks candidate windows by Jaccard similarity against the tail of the current prefix. The structural branch performs a bounded depth-first search from the anchor AST node covering the insertion line, recovering symbol-linked neighbors even when lexical overlap is weak. Both sets of candidates are then normalized into line identities of the form `file_path:line_no` and combined via Reciprocal Rank Fusion (RRF), which allows evidence supported by both branches to accumulate weight on the same line.
-
-**3. Prompt construction + generation**
-
-The fused and ranked snippets are serialized under a token budget and inserted into a backbone-specific FIM template (prefix / middle / suffix). The resulting prompt is passed to the language model to produce an initial completion.
-
-**4. Syntax-aware post-processing**
-
-The initial completion may be redundant or structurally misaligned with the surrounding code. ACAR applies AST-guided truncation: starting from the insertion node, the algorithm traverses upward in the user-side AST to identify the highest ancestor whose span remains aligned with the insertion line, repairs missing closing brackets, and trims overlaps against the existing prefix and suffix. The result is a completion that is syntactically consistent with its context.
-
----
-
-## Repository Structure
-
-The codebase is split into reusable modules and workflow glue. In general, `pipelines/` contains end-to-end logic while `scripts/` provides stable CLI entrypoints that delegate to those pipelines.
-
-```text
-.
-├── context_mixer.py               # Main retrieval orchestrator
-├── text_retrieval/                # Lexical retrieval modules
-├── graph_retrieval/               # LSP/graph retrieval modules
-├── ranking/                       # Reciprocal rank fusion
-├── post_processing/               # Parse/truncate/refinement logic
-├── pipelines/                     # End-to-end data/prompt/postprocess workflows
-├── scripts/                       # User-facing CLI entrypoints
-├── inference/                     # Model inference scripts
-├── schema/                        # Shared typed data structures
-├── programming_language/          # Language-specific config helpers
-└── requirements.txt
-```
-
----
-
-## Installation
-
-The project is pure Python. A virtual environment is recommended to keep dependencies isolated.
-
-```bash
-git clone https://anonymous.4open.science/r/ACAR
-cd ACAR
-
-python -m venv .venv
-source .venv/bin/activate
-
-pip install -r requirements.txt
-```
-
----
-
-## Dataset Setup
-
-All benchmark datasets can be bootstrapped with a single command:
-
-```bash
-bash scripts/download_datasets.sh
-```
-
-This script downloads and extracts data into:
-
-- `datasets/RepoEval`
-- `datasets/ReccEval` (includes `Source_Code/` and `metadata.jsonl`)
-- `datasets/CrossCodeEval`
-
-Downloaded archive files are removed automatically after successful extraction.
-
----
-
-## Troubleshooting
-
-The most common issues arise when using the structural and LSP retrieval components, which require additional tooling beyond Python packages. In practice, failures usually come down to one of two questions: can the environment resolve symbols for the target repository, and can the parser handle the file's language?
-
-- **LSP retrieval returns empty context:** ensure the relevant language server is available and the repository you are querying is accessible on disk.
-- **Tree-sitter parsing issues:** confirm Tree-sitter dependencies are installed from `requirements.txt` and that language IDs match supported values.
-
-If you only need lexical retrieval and post-processing, the pipeline can still run without any LSP dependency.
-
----
-
-## Command-Line Interface
-
-ACAR exposes lightweight CLI modules under `scripts/`. These are the intended interface for running the pipeline end-to-end. Each module is safe to call with `--help` (eager heavy imports are avoided), and all real work is delegated to the implementations under `pipelines/`.
-
-```text
-python -m scripts.build_prompts      --base_dir ... --input ... --output ...
-python -m scripts.post_process_jsonl --base_dir ... --input ... --output ...
-python -m scripts.post_process_safim [--input ...] [--output ...]
-```
-
-Use `--help` on each command for the full list of options.
-
----
+Line-level reciprocal rank fusion (RRF) rewards evidence supported by both retrievers and reconstructs adjacent selected lines into contiguous code spans.
 
 ## Quickstart
 
-At a high level, the workflow is: (1) build prompts with retrieval context, (2) run a FIM model to generate completions, (3) post-process to improve syntactic validity and insertion alignment, and (4) optionally apply the SAFIM-specific post-processing step if you are working with SAFIM-format outputs. The examples below mirror that flow.
+Run commands from the repository root. The CPU example uses Python 3.9+ and the pinned Tree-sitter 0.20.4 API. It downloads the NLTK stopword list on first use and runs on a CPU.
 
-### 1) Build prompts with retrieval context
+### 1. Install the example dependencies
 
-This step reads the dataset JSONL, retrieves repository context for each example, and writes a prompt JSONL ready for inference.
+```bash
+git clone https://github.com/longstnguyen/ACAR.git
+cd ACAR
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-demo.txt
+```
+
+### 2. Retrieve context and refine one insertion
+
+```bash
+python -m scripts.demo --output-dir result/demo
+```
+
+The example retrieves `shop/pricing.py` for an insertion in `shop/cart.py`, builds a Qwen2.5-Coder FIM prompt, and refines a fixed completion fixture containing an extra function. This exercises lexical retrieval, prompt formatting, and AST refinement. For model generation and hybrid prompt construction, continue with the [model workflow](#run-with-a-model).
+
+Use a new output directory for each run.
+
+### 3. Inspect and score the output
+
+```bash
+python -m scripts.evaluate --input result/demo/refined.jsonl
+```
+
+| Output | Contents |
+| :--- | :--- |
+| `result/demo/prompts.jsonl` | Source record, retrieved `contexts`, and FIM `prompt`. |
+| `result/demo/raw.jsonl` | The same record with the explicit completion fixture in `choices[0].text`. |
+| `result/demo/refined.jsonl` | The record with its refined insertion. |
+
+<details>
+<summary>Example terminal output</summary>
+
+```text
+ACAR | lexical retrieval + syntax-aware refinement
+Mode: CPU example; fixed completion fixture; no model or LSP
+Target: shop/cart.py:5
+Retrieved: 1 snippet(s)
+  shop/pricing.py | lines 1-4
+Prompt: Qwen2.5-Coder FIM with retrieved context
+Raw fixture: 'discounted_total(price, quantity, discount)\n\ndef unrelated():\n    pass'
+Refined: 'discounted_total(price, quantity, discount)'
+Output: result/demo
+```
+
+</details>
+
+## Run with a Model
+
+Install the full dependencies for structural retrieval and model generation:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+The hybrid prompt builder uses `multilspy` and `jedi-language-server`, installed by the full requirements. Keep the virtual environment activated so the server executable is on `PATH`. Each source repository gets its own cached LSP workspace. The batch workflow below processes Python repositories.
+
+### 1. Build one hybrid prompt
+
+The demo's prompt record also supplies the metadata needed by the hybrid builder:
 
 ```bash
 python -m scripts.build_prompts \
-  --base_dir datasets/ReccEval/Source_Code \
-  --input datasets/ReccEval/metadata.jsonl \
-  --output result/prompts.jsonl
+  --base_dir examples/repository \
+  --input result/demo/prompts.jsonl \
+  --output result/demo/hybrid_prompts.jsonl
 ```
 
-### 2) Run inference
+`--base_dir` supplies the source root for both target-file lookup and lexical retrieval. The builder uses the selected Qwen tokenizer to fit 2,048 tokens of retrieved context within an 8,000-token prompt. It preserves input fields and adds `prompt`, `contexts`, and token counts. Use the same `--model` checkpoint for prompt construction and generation.
 
-Inference consumes the prompt file and writes model generations to a new JSONL.
+### 2. Generate an insertion
 
 ```bash
-export ACAR_QWEN_INPUT=result/prompts.jsonl
-python inference/qwen_inference.py
+python -m inference.qwen_inference \
+  --input result/demo/hybrid_prompts.jsonl
 ```
 
-### 3) Post-process completions
+This loads `Qwen/Qwen2.5-Coder-0.5B` from Hugging Face and writes `result/demo/hybrid_prompts_Qwen2.5-Coder-0.5B.jsonl`. The helper processes records individually, samples up to 48 new tokens with temperature 0.2 and top-k 5 by default. Generation stops at end-of-text, FIM, or file-separator tokens. A CUDA GPU is recommended; model placement uses `device_map="auto"`.
 
-Post-processing re-parses model outputs and applies syntax-aware truncation and cleanup. This step has the largest individual impact on final quality and should not be skipped.
+### 3. Refine and evaluate
 
 ```bash
 python -m scripts.post_process_jsonl \
-  --base_dir datasets/ReccEval/Source_Code \
-  --input result/prompts_Qwen2.5-Coder-0.5B.jsonl \
-  --output result/prompts_Qwen2.5-Coder-0.5B_post.jsonl
+  --base_dir examples/repository \
+  --input result/demo/hybrid_prompts_Qwen2.5-Coder-0.5B.jsonl \
+  --output result/demo/hybrid_refined.jsonl
+
+python -m scripts.evaluate --input result/demo/hybrid_refined.jsonl
 ```
 
-### 4) SAFIM post-processing pipeline
+Inspect any `error` records or `ERROR:` completions before scoring. Use a separate directory for each experiment: the batch writers overwrite their specified output files.
 
-If you are running SAFIM-format outputs, this step applies the SAFIM-specific refinement routine on top of the standard post-processing.
+<details>
+<summary>Select another Qwen checkpoint or generation length</summary>
+
+```python
+from inference.qwen_inference import QwenInference
+
+model = QwenInference(model_name="Qwen/Qwen2.5-Coder-3B")
+output_path = model.process_file(
+    "result/demo/hybrid_prompts.jsonl",
+    max_new_tokens=48,
+)
+print(output_path)
+```
+
+Pass `--model`, `--max-new-tokens`, `--temperature`, and `--top-k` to the CLI to customize generation. Set `--temperature 0` for greedy decoding; `--seed` defaults to 42.
+
+</details>
+
+## Configuration
+
+Configure batch runs through the CLI and retrieval through Python constructors.
+
+| Setting | Current value / interface | Location |
+| :--- | :--- | :--- |
+| Lexical corpus root | `--base_dir`; `ACAR_BASE_DIR` is the direct `ContextMixer()` fallback | [`context_mixer.py`](context_mixer.py) |
+| Target file root | Required `--base_dir` | [`scripts/build_prompts.py`](scripts/build_prompts.py) |
+| Query and candidate windows | 50 lines | [`JaccardSimilarityRetriever`](text_retrieval/jaccard_retriever.py) |
+| Sliding step | 10 lines | `JaccardSimilarityRetriever(slide=...)` |
+| Lexical candidates | Top 10 globally; up to 20 non-overlapping windows per file | `max_chunk_result`, `max_matches_per_file` |
+| Structural expansion | One nearby call; depth 2; up to 10 source bodies | [`graph_retrieval/lsp.py`](graph_retrieval/lsp.py) |
+| RRF damping | `RRF_K = 60` | [`ranking/reciprocal_rank_fusion.py`](ranking/reciprocal_rank_fusion.py) |
+| Retrieved-context budget | 2,048 tokens including file headers; `--context-budget` | [`prompt/budget.py`](prompt/budget.py) |
+| Total prompt budget | 8,000 tokens; `--input-budget` | [`scripts/build_prompts.py`](scripts/build_prompts.py) |
+| Qwen input | `--input`; falls back to `ACAR_QWEN_INPUT` | [`inference/qwen_inference.py`](inference/qwen_inference.py) |
+| Checkpoint | `Qwen/Qwen2.5-Coder-0.5B` | `QwenInference(model_name=...)` |
+| Generation | Up to 48 tokens; temperature 0.2; top-k 5 | `QwenInference.process_file()` |
+
+<details>
+<summary>FIM templates and SAFIM workflow</summary>
+
+[`prompt/fim_utils.py`](prompt/fim_utils.py) defines Qwen2.5, earlier Qwen, DeepSeek, StarCoder, Code Llama, CodeGemma, and plain left-context templates. The batch prompt builder selects `CodeQwen25PromptExtractor`; changing templates requires selecting the appropriate extractor in the caller and using a compatible model.
+
+For SAFIM-format generations, use the separate adapter:
 
 ```bash
 python -m scripts.post_process_safim \
@@ -211,164 +193,312 @@ python -m scripts.post_process_safim \
   --output result/qwen-safim-infillng-post_processed.jsonl
 ```
 
----
+This adapter loads SAFIM data through [`pipelines/process_data.py`](pipelines/process_data.py).
 
-## Outputs
+</details>
 
-Running the pipeline produces a small set of JSONL artifacts that are straightforward to track and diff. Output naming is mostly convention-based: inference derives filenames from the input prompt file, and post-processing appends a suffix (e.g., `_post`).
+## Datasets
 
-- Prompt file (from `scripts.build_prompts`): e.g., `result/prompts.jsonl`
-- Model generations (from `inference/qwen_inference.py`): derived from the input, e.g., `result/prompts_Qwen2.5-Coder-0.5B.jsonl`
-- Post-processed generations (from `scripts.post_process_jsonl`): e.g., `result/prompts_Qwen2.5-Coder-0.5B_post.jsonl`
-- SAFIM post-processed output (from `scripts.post_process_safim`): e.g., `result/qwen-safim-infillng-post_processed.jsonl`
+ACAR is evaluated on three repository-level code completion benchmarks. RepoEval [1] covers three target granularities, ReccEval [2] emphasizes Python cross-file dependencies, and CrossCodeEval [3] spans four languages.
 
----
+| Benchmark | Language | Repositories | Completion instances | Task |
+| :--- | :--- | ---: | ---: | :--- |
+| RepoEval — line | Python | 8 | 1,600 | Line insertion |
+| RepoEval — API | Python | 8 | 1,600 | API invocation |
+| RepoEval — function | Python | 8 | 455 | Function body |
+| ReccEval | Python | 2,635 | 6,461 | Line completion |
+| CrossCodeEval | Python | 471 | 2,665 | Cross-file completion |
+| CrossCodeEval | Java | 239 | 2,139 | Cross-file completion |
+| CrossCodeEval | TypeScript | 193 | 3,356 | Cross-file completion |
+| CrossCodeEval | C# | 99 | 1,768 | Cross-file completion |
 
-## Input Data Expectations
+Counts follow the paper's Benchmark Statistics appendix. RepoEval's eight repositories are shared across its tasks. The reported total is 20,044 instances across 3,645 repositories, counting those eight once.
 
-ACAR expects JSONL records that contain enough information to (i) define the FIM target (prefix and suffix) and (ii) locate the insertion point within the repository (metadata fields). The fields below are the minimal set used by the provided pipeline scripts.
+### Obtain the benchmarks
 
-**Prompt building input (`scripts.build_prompts`)**
+Use the original distributions and their evaluation instructions:
 
-JSONL records should include:
+- [1] [RepoEval / RepoCoder](https://github.com/microsoft/CodeT/tree/main/RepoCoder): completion records and repository-level evaluation resources.
+- [2] [ReccEval / DraCo](https://github.com/nju-websoft/DraCo/tree/main/ReccEval): Python source archives and completion metadata.
+- [3] [CrossCodeEval](https://github.com/amazon-science/cceval): multilingual completion records and repository acquisition instructions.
 
-- `prefix`
-- `suffix`
-- `metadata.fpath_tuple`
-- `metadata.line_no`
-- `metadata.context_start_characterno`
+The download helper fetches the configured archives into `datasets/RepoEval`, `datasets/ReccEval`, and `datasets/CrossCodeEval`:
 
-**General post-processing input (`scripts.post_process_jsonl`)**
-
-JSONL records should include:
-
-- `prefix`
-- `suffix`
-- `metadata.*` (same indexing fields as above)
-- `choices[0].text`
-
----
-
-## Core API Example
-
-The example below shows how to invoke the retrieval pipeline directly through the `ContextMixer` API, without going through the CLI scripts.
-
-```python
-import asyncio
-
-from context_mixer import ContextMixer
-from schema.common import Document, Position
-
-
-async def demo() -> None:
-    mixer = ContextMixer()
-    document = Document(
-        uri="test/test.py",
-        language_id="python",
-        text="def f():\n    pass\n",
-        prefix="def f():\n    ",
-        suffix="pass\n",
-    )
-    pos = Position(line=1, character=4)
-    result = await mixer.get_context(document, pos, repo="test")
-    print("retrieved:", len(result["context"]))
-
-
-asyncio.run(demo())
+```bash
+bash scripts/download_datasets.sh
 ```
 
----
+It requires Bash 4+, `curl` or `wget`, `unzip`, and `tar` with xz support. Run it in a fresh dataset directory; extraction may overwrite existing files. Source-repository acquisition and conversion into the input schema below remain benchmark-specific. Dataset terms are separate from the code's MIT license.
 
-## Environment Variables
+## Evaluation
 
-Environment variables are optional but convenient for scripting and reproducible runs. All pipeline scripts fall back to sensible defaults when these are not set.
+The scorer reads a JSONL file containing `choices[0].text` and a reference field:
 
-- `ACAR_BASE_DIR`: default retrieval base directory (default: `datasets/ReccEval/Source_Code`).
-- `ACAR_QWEN_INPUT`: input JSONL path for `inference/qwen_inference.py`.
-- `ACAR_SAFIM_INPUT`: SAFIM input JSONL path.
-- `ACAR_SAFIM_OUTPUT`: SAFIM post-processed output JSONL path.
+```bash
+python -m scripts.evaluate \
+  --input result/demo/refined.jsonl \
+  --reference-field groundtruth
+```
 
----
+| Metric | Definition | Scale |
+| :--- | :--- | :--- |
+| Exact Match (EM) | Fraction of predictions identical to the reference. | 0–100, higher is better |
+| Edit Similarity (ES) | Mean of `1 - Levenshtein(prediction, reference) / max(lengths)`. | 0–100, higher is better |
+
+Scoring preserves whitespace and compares Unicode characters. Two empty strings have similarity 1. The output includes the evaluated count `n`; resolve malformed records and pipeline errors before scoring.
+
+For CrossCodeEval, score each language separately and take the unweighted mean of the four language scores. The JSONL scorer averages over instances within each file.
+
+### Benchmark protocol
+
+Use the same examples, checkpoint, input budget, decoding configuration, and normalization for every method. Keep raw and refined completions separately so that retrieval and post-processing effects can be examined independently. Record the code revision, package versions, language-server environment, and retained instance IDs with each run.
+
+The paper reports unquantized models, an 8,000-token input budget, a 2,048-token retrieved-context budget, 48 generated tokens, temperature 0.2, and top-k 5. Retrieval uses 50-line windows with step 10, top-k 10 for each branch, depth 2, and RRF constant 60.
 
 ## Results
 
-ACAR is evaluated on three repository-level benchmarks—RepoEval [1], ReccEval [2], and CrossCodeEval [3]—across Python, Java, TypeScript, and C#, covering more than 3,000 real-world repositories. Across two Qwen2.5-Coder backbones (0.5B and 3B), ACAR delivers the strongest overall performance on most Exact Match (EM) and Edit Similarity (ES) metrics against five strong repository-level baselines. The numbers below are intended as a quick reference; for careful comparisons, keep backbone, decoding settings, and dataset version fixed.
+Results from the paper are summarized below. EM and ES use a 0–100 scale; differences are absolute score points. CrossCodeEval aggregate scores are macro-averages over Python, Java, TypeScript, and C#.
 
-**Key findings:**
+### Main comparison — Qwen2.5-Coder-3B
 
-- Hybrid retrieval improves both EM and ES in most benchmark settings over all compared baselines.
-- Syntax-aware post-processing is the single most impactful component: removing it causes the largest quality drops across all benchmarks and both backbones.
-- Prompt construction remains under 100 ms across all three benchmarks, supporting interactive development workflows.
+Each cell is **EM / ES**. **Bold** marks the best value and <ins>underlining</ins> marks the second-best, ranked separately for each metric among the methods shown. Ties share the same formatting.
 
-### Highlights by Research Question
+| Method | RepoEval line | RepoEval API | RepoEval function | ReccEval | CrossCodeEval |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| RepoCoder | **38.03** / <ins>67.43</ins> | <ins>28.32</ins> / 56.23 | 2.32 / 34.38 | 30.10 / 66.94 | 16.85 / 67.54 |
+| Repoformer | 34.68 / 64.27 | 26.82 / <ins>62.11</ins> | <ins>6.14</ins> / <ins>56.20</ins> | <ins>36.25</ins> / <ins>69.20</ins> | <ins>28.40</ins> / <ins>71.45</ins> |
+| RLCoder | 10.41 / 33.12 | 13.11 / 28.79 | 0.66 / 12.21 | 13.76 / 55.18 | 12.78 / 62.74 |
+| CodeRAG | 14.18 / 46.19 | 14.17 / 54.87 | 0.31 / 31.63 | 23.82 / 63.33 | 16.66 / 66.20 |
+| DraCo | 34.92 / 55.95 | 27.95 / 57.72 | 2.64 / 34.83 | 33.27 / 68.38 | 22.97 / 69.75 |
+| GraphCoder | 32.97 / 61.48 | 25.86 / 61.72 | 5.29 / 54.61 | 33.71 / 68.02 | 23.94 / 69.02 |
+| CoCoMIC | 34.48 / 53.90 | 28.16 / 55.23 | 2.33 / 34.23 | 20.85 / 62.59 | 13.49 / 63.98 |
+| **ACAR** | <ins>37.50</ins> / **69.52** | **29.04** / **68.43** | **8.35** / **59.60** | **42.98** / **72.46** | **32.86** / **74.34** |
 
-- **RQ1 (Performance):** ACAR leads on most metrics across RepoEval, ReccEval, and CrossCodeEval, with especially clear gains at API and function levels where structural dependencies are most prominent.
-- **RQ2 (Practicality):** Prompt construction stays under 100 ms, roughly 3.5× faster than lighter baselines such as DRACO and REPOCODER, and orders of magnitude faster than heavier pipelines like COCOMIC (4,743 ms on ReccEval). Performance remains stable across backbone scales from Qwen2.5-Coder-0.5B to DeepSeek-Coder-6.7B.
-- **RQ3 (Multilingual generalization):** ACAR maintains strong performance across Python, Java, TypeScript, and C#, indicating that the hybrid lexical-structural retrieval strategy transfers well across language families and structural conventions.
-- **RQ4 (Component contribution):** Ablations confirm that lexical retrieval, structural retrieval, and post-processing are complementary rather than interchangeable. Removing post-processing causes the largest individual quality drop—for example, from 72.46 to 54.28 ES on ReccEval under Qwen2.5-Coder-3B.
+Source: Tables 1–3 in the paper. Parser-dependent baseline results exclude failed instances and use method-specific subsets. ACAR's multilingual scores use full coverage; see the paper's Multilingual Baseline Adaptation appendix for retained counts and adapter details.
 
-Representative scores include **42.98 EM / 72.46 ES** on ReccEval (Qwen2.5-Coder-3B) and **32.86 EM / 74.34 ES** on CrossCodeEval (Qwen2.5-Coder-3B), in each case with clear margins over the best-performing baseline under the same evaluation setup.
+<details>
+<summary>Qwen2.5-Coder-0.5B comparison</summary>
 
-The table below summarizes RepoEval results across baselines—including DraCo [2], CoCoMIC [4], RepoCoder [1], GraphCoder [5], and Repoformer [6]—under Qwen2.5-Coder backbones.
+| Method | RepoEval line | RepoEval API | RepoEval function | ReccEval | CrossCodeEval |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| RepoCoder | 24.58 / **58.56** | 16.78 / 48.78 | 2.12 / 32.78 | 24.57 / 62.82 | 12.97 / 63.93 |
+| Repoformer | <ins>28.12</ins> / 52.34 | 18.11 / <ins>55.45</ins> | <ins>3.83</ins> / <ins>48.92</ins> | <ins>27.97</ins> / **63.41** | <ins>19.40</ins> / <ins>66.10</ins> |
+| RLCoder | 8.63 / 34.99 | 11.44 / 31.84 | 0.00 / 13.42 | 7.51 / 48.75 | 7.07 / 56.23 |
+| CodeRAG | 10.38 / 42.31 | 11.13 / 49.08 | 0.00 / 29.75 | 13.99 / 54.50 | 9.71 / 59.78 |
+| DraCo | 18.75 / 42.38 | 17.69 / 45.18 | 2.22 / 32.17 | 26.25 / 60.95 | 17.61 / 64.56 |
+| GraphCoder | 26.91 / 50.88 | 17.94 / 53.47 | 2.86 / 46.73 | 25.83 / <ins>62.94</ins> | 16.72 / 65.26 |
+| CoCoMIC | 23.51 / 44.38 | <ins>18.16</ins> / 44.30 | 1.47 / 30.04 | 14.43 / 56.36 | 9.85 / 60.45 |
+| **ACAR** | **33.62** / <ins>54.65</ins> | **19.96** / **59.57** | **5.27** / **51.71** | **30.21** / 61.03 | **22.13** / **67.38** |
 
-<img width="100%" alt="RepoEval results" src="assets/results_repoeval.png" />
+</details>
 
-The next table reports CrossCodeEval performance broken down by programming language, showing ACAR against the same family of baselines.
+### Multilingual completion
 
-<img width="100%" alt="CrossCodeEval results by language" src="assets/results_crosscodeeval.png" />
+ACAR on CrossCodeEval, reported as EM / ES across model sizes. Source: Table 4 in the paper.
 
----
+| Backbone | Python | Java | TypeScript | C# | Macro-average |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| Qwen2.5-Coder-0.5B | 28.74 / 75.56 | 17.63 / 65.99 | 20.67 / 63.37 | 21.49 / 64.61 | 22.13 / 67.38 |
+| Qwen2.5-Coder-3B | 39.89 / 75.56 | 29.31 / 73.82 | 26.43 / 73.33 | 35.80 / 74.66 | 32.86 / 74.34 |
 
-## Reproducibility Notes
+### Retrieval and refinement overhead
 
-To keep runs comparable across machines and over time, it is helpful to record a compact set of configuration details alongside each set of outputs.
+Milliseconds per completion, under warm-cache conditions, excluding decoding. All methods use a 2,048-token retrieved-context budget in this timing study. Source: Figure 4 and the Efficiency and Scalability section. Lower is better.
 
-- Keep dataset paths explicit in command scripts rather than relying on environment-variable defaults.
-- Record model checkpoint names and decoding seeds per run.
-- Ensure language-server setup is consistent across machines when evaluating graph retrieval, as symbol resolution can vary across environments.
+| Method | ReccEval | RepoEval | CrossCodeEval |
+| :--- | ---: | ---: | ---: |
+| **ACAR** | **89** | **87** | **95** |
+| Repoformer | <ins>100</ins> | <ins>98</ins> | <ins>105</ins> |
+| RepoCoder | 312 | 308 | 332 |
+| DraCo | 328 | 320 | 327 |
+| GraphCoder | 530 | 520 | 540 |
+| RLCoder | 1,215.8 | 804.6 | 1,100.2 |
+| CodeRAG | 2,140.6 | 2,291.1 | 2,441.0 |
+| CoCoMIC | 4,743 | 4,025 | 4,113 |
 
----
+Measured on an AMD EPYC 7V13 with 24 allocated CPU cores, an NVIDIA A100 80 GB, and 512 GB RAM.
 
-## Citation
+## Findings
 
-If you use ACAR in your research, please cite the paper below.
+- **Hybrid retrieval improves completion quality.** At Qwen2.5-Coder-3B, ACAR gains **6.73 EM points** on ReccEval and **4.46** on aggregate CrossCodeEval over the strongest retrieval baseline. Across the two main Qwen scales, it leads **5 of 6** RepoEval settings for each metric.
 
-```bibtex
-@inproceedings{acar2026,
-  title={Fast and Focused: Interactive Repository-Level Fill-in-the-Middle Code Completion with Hybrid Structural Retrieval},
-  author={Anonymous},
-  year={2026},
-  booktitle={ARR Submission}
+- **Lexical and structural evidence complement each other.** ReccEval EM at 3B reaches **42.98** with both branches, compared with **39.24** for text-only and **38.49** for graph-only. All three variants use the same post-processing.
+
+- **Syntax-aware refinement makes insertions more precise.** Removing it lowers 3B ES from **72.46 → 54.28** on ReccEval, **74.34 → 65.40** on CrossCodeEval, and **69.52 → 54.65** on RepoEval-line. Its effect depends on the generation pipeline: transfer to Repoformer and GraphCoder produces mixed results.
+
+- **Backbone capacity and completion type shape retrieval gains.** With the largest tested Qwen and DeepSeek backbones, ACAR improves EM over standalone generation in **all five settings**. Smaller Qwen models favor standalone generation on short RepoEval line and API targets, motivating selective retrieval.
+
+- **Structural context stays lightweight as repositories grow.** Benchmark overhead is **87–95 ms** with warm caches, excluding decoding. Aggregate stress tests span **12k–117k files**, with retrieval taking **0.77–1.83 s** and the LSP branch contributing at most **178 ms**; lexical scanning accounts for most of the growth.
+
+- **Longer synthesis benefits from reusable repository evidence.** Under Qwen2.5-Coder-7B, function-level EM is **28.57** overall and **10.66** on records without detected retrieved-answer overlap. ReccEval changes only slightly, from **44.33 → 43.89**. These subsets also differ in task difficulty.
+
+<details>
+<summary>Component ablation — Qwen2.5-Coder-3B</summary>
+
+EM / ES, from Tables 1–3 in the paper. Text-only and graph-only retain post-processing.
+
+| Variant | RepoEval line | RepoEval API | RepoEval function | ReccEval | CrossCodeEval |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| Text-only | <ins>37.27</ins> / <ins>63.84</ins> | <ins>26.44</ins> / <ins>67.03</ins> | <ins>6.11</ins> / <ins>57.80</ins> | <ins>39.24</ins> / <ins>64.82</ins> | <ins>30.73</ins> / <ins>70.87</ins> |
+| Graph-only | 36.77 / 62.34 | 25.94 / 66.53 | 5.81 / 57.30 | 38.49 / 63.37 | 30.43 / 69.37 |
+| Without post-processing | 33.62 / 54.65 | 22.84 / 54.47 | 4.62 / 54.99 | 33.99 / 54.28 | 28.59 / 65.40 |
+| **Full ACAR** | **37.50** / **69.52** | **29.04** / **68.43** | **8.35** / **59.60** | **42.98** / **72.46** | **32.86** / **74.34** |
+
+</details>
+
+<details>
+<summary>Backbone scaling — EM gains over standalone</summary>
+
+Absolute EM points, from the paper's Backbone Scaling Results appendix. CrossCodeEval here is Python only.
+
+| Backbone | RepoEval line | RepoEval API | RepoEval function | CrossCodeEval Python | ReccEval |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Qwen2.5-Coder-0.5B | -3.13 | -4.35 | +2.85 | +8.59 | +9.61 |
+| Qwen2.5-Coder-3B | -16.06 | -7.52 | +3.30 | +9.16 | +11.50 |
+| Qwen2.5-Coder-7B | +9.46 | +10.10 | +20.66 | +28.82 | +10.12 |
+| DeepSeek-Coder-1.3B | +13.60 | +9.22 | +1.10 | +8.45 | +13.50 |
+| DeepSeek-Coder-6.7B | +16.81 | +15.69 | +9.67 | +14.56 | +18.45 |
+
+</details>
+
+## Adapting ACAR
+
+### 1. Prepare repository files and completion records
+
+Place each source repository beneath a common root, retaining its import structure:
+
+```text
+examples/repository/
+└── shop/
+    ├── cart.py
+    └── pricing.py
+```
+
+Each JSONL line describes one insertion. The minimal record for the bundled example is:
+
+```json
+{
+  "prefix": "from pricing import discounted_total\n\n\ndef checkout(price, quantity, discount):\n    return ",
+  "suffix": "\n",
+  "groundtruth": "discounted_total(price, quantity, discount)",
+  "metadata": {
+    "fpath_tuple": ["shop", "cart.py"],
+    "line_no": 4,
+    "context_start_characterno": 11
+  }
 }
 ```
 
----
+The expanded JSON above is for readability; serialize each record onto a single line in a `.jsonl` file.
 
-## Ethics Statement
+| Field | Meaning |
+| :--- | :--- |
+| `prefix` | Visible code before the insertion; retain indentation. |
+| `suffix` | Visible code after the insertion. |
+| `metadata.fpath_tuple` | Path components relative to `--base_dir`; the first identifies the repository. |
+| `metadata.line_no` | Zero-based cursor line in `prefix + suffix`. |
+| `metadata.context_start_characterno` | Zero-based cursor column, using the same source text. |
+| `groundtruth` | Held-out reference used only for scoring; optional during prompt construction. |
+| `choices[0].text` | Raw model insertion, required for refinement and scoring. |
 
-This project is intended for research and evaluation of repository-level code completion. A few considerations are worth keeping in mind when deploying or extending it.
+For new data, compute the cursor from the actual prefix: line is `prefix.count("\n")` and column is `len(prefix.rsplit("\n", 1)[-1])`. The pipeline constructs `document.text = prefix + suffix` and `offset = len(prefix)`, so coordinates must refer to that reconstructed text. For non-ASCII code, verify byte and language-server position conventions in your adapter.
 
-- **Data and licensing:** benchmark datasets are distributed under their own terms; users are responsible for complying with the licenses and policies of any repositories or datasets they evaluate on.
-- **Model outputs:** generated code may be incorrect, insecure, or non-idiomatic even when it appears syntactically valid. All outputs should be subject to human review, testing, and security validation before being used in real systems.
+### 2. Keep retrieval evidence separate from the target
 
----
+Remove the held-out answer from the source snapshot used by retrieval and keep it only in the scoring field. The lexical retriever excludes the active file; the language server can still read files from disk. Ensure those files reflect the incomplete input, and keep the source prefix and suffix aligned with the file's contents and symbol positions.
+
+### 3. Run a small sample before scaling
+
+Convert one or two records into the schema, pass the source root with `--base_dir`, and follow [Run with a Model](#run-with-a-model). Inspect retrieved paths, insertion coordinates, generated text, and refinement before extending to a whole dataset. Save failures with their instance IDs and report evaluation coverage.
+
+## Extending ACAR
+
+Extend ACAR through the modules below and connect each implementation at its caller.
+
+| Extension | Entry points | Integration steps |
+| :--- | :--- | :--- |
+| New lexical retriever | [`text_retrieval/`](text_retrieval), [`ContextMixer`](context_mixer.py) | Implement `identifier` and async `retrieve(document, position, repo)`. Return snippets with URI, content, line span, and `to_dict()`, then register the instance in `self.retrievers`. |
+| Ranking or context selection | [`fuse_results`](ranking/reciprocal_rank_fusion.py), `ContextMixer.get_context()` | Preserve candidate order, define line identities and tie-breaking, and apply a budget before prompt serialization. |
+| Another FIM backbone | [`FIMModelSpecificPromptExtractor`](prompt/fim_utils.py) | Implement the model's special-token format and snippet serialization, select the extractor in the prompt builder, and pair it with its tokenizer and generation helper. |
+| Another source language | [`programming_language/`](programming_language), [`tree_sitter_local/`](tree_sitter_local), [`graph_retrieval/`](graph_retrieval), [`text_retrieval/tool.py`](text_retrieval/tool.py) | Add syntax queries and node types, language-server support, file extensions, and language-aware batch records. Test symbol resolution and insertion boundaries together. |
+| Another dataset schema | [`pipelines/prompt_builder.py`](pipelines/prompt_builder.py), [`pipelines/post_process_jsonl.py`](pipelines/post_process_jsonl.py) | Convert to the documented record schema and preserve IDs, prefixes, suffixes, coordinates, and references through inference. |
+| Another metric | [`scripts/evaluate.py`](scripts/evaluate.py) | Add scoring with explicit normalization and failure handling; report the denominator and aggregation unit. |
+
+## Development
+
+Install the relevant requirements, then run the focused checks:
+
+```bash
+python -m unittest discover -s tests -v
+python -m scripts.demo --output-dir result/dev-check
+python -m scripts.evaluate --input result/dev-check/refined.jsonl
+python -m scripts.build_prompts --help
+python -m scripts.post_process_jsonl --help
+python -m scripts.post_process_safim --help
+```
+
+The `test/` directory contains small repository fixtures for symbol resolution. The `tests/` directory contains automated checks. The CPU demo covers retrieval, prompt construction, and refinement together.
+
+<details>
+<summary>Code structure</summary>
+
+```text
+context_mixer.py              Retrieval orchestration and line selection
+text_retrieval/               Jaccard scoring and source-file discovery
+graph_retrieval/              Identifier extraction and LSP symbol context
+ranking/                     Reciprocal rank fusion
+prompt/                      FIM templates and tokenizer-based budgets
+inference/                   Model loading and generation
+post_processing/             AST truncation and overlap trimming
+context/                     Prefix/suffix and multiline analysis
+schema/                      Documents, positions, and snippet records
+tree_sitter_local/           Parser and syntax queries
+programming_language/        Language-specific syntax settings
+pipelines/                   JSONL and SAFIM workflows
+scripts/                     CLI wrappers, demo, scoring, and downloads
+examples/                    Small Python repository for the quickstart
+test/                        Existing symbol-resolution fixtures
+tests/                       Automated checks
+docs/assets/                 Pixel banner and original framework figure
+```
+
+</details>
+
+### Troubleshooting
+
+| Symptom | Check |
+| :--- | :--- |
+| Empty lexical context | Check `--base_dir`, `fpath_tuple[0]`, and the Python source files beneath that root. |
+| Empty structural context | Check `jedi-language-server --help` in the active environment, source imports, workspace location, and cursor positions. Check the reported lookup error if definitions are unavailable. |
+| Tree-sitter API error | Install the pinned `tree_sitter==0.20.4` and `tree_sitter_languages==1.10.2` pair in the active environment. |
+| NLTK resource error | Run `python -m nltk.downloader stopwords` in that environment and ensure the resources are accessible to the runtime. |
+| Missing output directory | Create the parent directory before using the batch scripts. The demo creates its own output directory. |
+| Model memory error | Start with the 0.5B checkpoint and a short prompt; reduce generation length and verify available device memory. |
+| Evaluation rejects a record | Resolve its pipeline error or supply the missing reference. |
+
+## Citation
+
+ACAR accompanies **Fast and Focused: Interactive Repository-Level Fill-in-the-Middle Code Completion with Hybrid Structural Retrieval**, accepted to **EMNLP 2026, Main Conference, Oral**.
+
+```bibtex
+@inproceedings{nguyen2026acar,
+  title = {Fast and Focused: Interactive Repository-Level Fill-in-the-Middle Code Completion with Hybrid Structural Retrieval},
+  author = {Nguyen, Long S. T. and Huynh, Dat T. and Vo, Quynh T. N. and Le, Dang and Nguyen, Cong-Duy and Luu, Anh Tuan and Nguyen-Duc, Anh and Quan, Tho T.},
+  booktitle = {Proceedings of the 2026 Conference on Empirical Methods in Natural Language Processing},
+  year = {2026}
+}
+```
+
+Machine-readable metadata is available in [`CITATION.cff`](CITATION.cff).
 
 ## License
 
-This repository is intended for research use under the MIT License.
-
----
+Code is released under the [MIT License](LICENSE), copyright © 2026 Long S. T. Nguyen. Benchmark datasets, source repositories, and model checkpoints retain their respective licenses and usage conditions.
 
 ## References
 
-[1] Fengji Zhang, Bei Chen, Yue Zhang, Jacky Keung, Jin Liu, Daoguang Zan, Yi Mao, Jian-Guang Lou, Weizhu Chen. *RepoCoder: Repository-Level Code Completion Through Iterative Retrieval and Generation*. EMNLP, 2023.
+[1] Fengji Zhang et al. [RepoCoder: Repository-Level Code Completion Through Iterative Retrieval and Generation](https://aclanthology.org/2023.emnlp-main.151/). EMNLP, 2023.
 
-[2] Wei Cheng, Yuhan Wu, Wei Hu. *Dataflow-Guided Retrieval Augmentation for Repository-Level Code Completion*. ACL, 2024.
+[2] Wei Cheng, Yuhan Wu, and Wei Hu. [Dataflow-Guided Retrieval Augmentation for Repository-Level Code Completion](https://aclanthology.org/2024.acl-long.431/). ACL, 2024.
 
-[3] Yangruibo Ding, Zijian Wang, Wasi Uddin Ahmad, Hantian Ding, Ming Tan, Nihal Jain, Murali Krishna Ramanathan, Ramesh Nallapati, Parminder Bhatia, Dan Roth, Bing Xiang. *CrossCodeEval: A Diverse and Multilingual Benchmark for Cross-File Code Completion*. NeurIPS Datasets and Benchmarks Track, 2023.
-
-[4] Yangruibo Ding, Zijian Wang, Wasi Ahmad, Murali Krishna Ramanathan, Ramesh Nallapati, Parminder Bhatia, Dan Roth, and Bing Xiang. *CoCoMIC: Code Completion by Jointly Modeling In-file and Cross-file Context*. LREC-COLING, 2024.
-
-[5] Wei Liu, Ailun Yu, Daoguang Zan, Bo Shen, Wei Zhang, Haiyan Zhao, Zhi Jin, and Qianxiang Wang. *GraphCoder: Enhancing Repository-Level Code Completion via Coarse-to-fine Retrieval Based on Code Context Graph*. ASE, 2024.
-
-[6] Di Wu, Wasi Uddin Ahmad, Dejiao Zhang, Murali Krishna Ramanathan, and Xiaofei Ma. *Repoformer: Selective Retrieval for Repository-Level Code Completion*. ICML, 2024.
+[3] Yangruibo Ding et al. [CrossCodeEval: A Diverse and Multilingual Benchmark for Cross-File Code Completion](https://github.com/amazon-science/cceval). NeurIPS Datasets and Benchmarks, 2023.

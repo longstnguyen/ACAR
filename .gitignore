@@ -12,3 +12,16 @@ result/
 **/__pycache__/
 *.py[cod]
 .venv/
+
+# Local configuration, credentials, and generated runs
+.env
+.env.*
+!.env.example
+ssh.text
+*.pem
+*.key
+results/
+.data/
+.cache/
+.pytest_cache/
+*.log

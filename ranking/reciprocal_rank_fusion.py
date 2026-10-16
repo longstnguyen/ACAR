@@ -1,77 +1,62 @@
-from collections import defaultdict
-from typing import List, Set, TypeVar, Callable
+"""Deterministic reciprocal rank fusion over source lines."""
+from dataclasses import dataclass, asdict
+from typing import Callable, Iterable, List
 
-T = TypeVar("T")
 RRF_K = 60
 
-def fuse_results(
-    retrieved_sets: List[Set[T]], ranking_identities: Callable[[T], List[str]]
-) -> Set[T]:
+
+@dataclass
+class FusedSnippet:
+    uri: str
+    start_line: int
+    end_line: int
+    content: str
+    score: float
+
+    def to_dict(self):
+        return asdict(self)
+
+
+def fuse_results(retrieved_sets: Iterable, ranking_identities: Callable) -> List[FusedSnippet]:
+    """Return ranked lines; each branch contributes only its best containing rank.
+
+    Inputs must be ordered rankings, despite the legacy argument name.
+    Ties retain first-seen order, with lines within a snippet in source order.
     """
-    Implements a basic variant of reciprocal rank fusion to combine context items from various
-    retrievers into one result set.
-
-    Args:
-        retrieved_sets: Lists of result sets from different retrievers
-        ranking_identities: Function that returns identifiers for each result
-
-    Returns:
-        A fused set of results
-    """
-    # For every retrieved result set, create a map of results by document
-    results_by_document = {}
-    
-    for retriever_index, results in enumerate(retrieved_sets):
-        for result in results:
-            for doc_id in ranking_identities(result):
-                if doc_id not in results_by_document:
-                    results_by_document[doc_id] = {}
-                
-                if retriever_index not in results_by_document[doc_id]:
-                    results_by_document[doc_id][retriever_index] = []
-                
-                results_by_document[doc_id][retriever_index].append(result)
-
-    # Rank the order of documents using reciprocal rank fusion
-    fused_document_scores = {}
-    
-    for retriever_index, results in enumerate(retrieved_sets):
-        for rank, result in enumerate(results):
-            for doc_id in ranking_identities(result):
-                # Only consider the best ranked result per document for each retriever
-                if results_by_document[doc_id][retriever_index][0] != result:
+    evidence = {}
+    for ranking in retrieved_sets:
+        if isinstance(ranking, (set, frozenset)):
+            raise TypeError("RRF requires ordered rankings, not sets")
+        seen = set()
+        for rank, snippet in enumerate(ranking, start=1):
+            lines = snippet.content.split("\n")
+            identities = ranking_identities(snippet)
+            for offset, identity in enumerate(identities):
+                if offset >= len(lines) or identity in seen:
                     continue
-                
-                reciprocal_rank = 1 / (RRF_K + rank)
-                
-                if doc_id not in fused_document_scores:
-                    fused_document_scores[doc_id] = 0
-                
-                fused_document_scores[doc_id] += reciprocal_rank
+                seen.add(identity)
+                if identity not in evidence:
+                    evidence[identity] = FusedSnippet(
+                        snippet.uri, snippet.start_line + offset,
+                        snippet.start_line + offset, lines[offset], 0.0,
+                    )
+                evidence[identity].score += 1.0 / (RRF_K + rank)
+    return sorted(evidence.values(), key=lambda item: -item.score)
 
-    # Sort documents by score in descending order
-    top_documents = sorted(fused_document_scores.keys(), 
-                          key=lambda doc_id: fused_document_scores[doc_id], 
-                          reverse=True)
-    
-    fused_results = set()
 
-    # Combine results from each document and retriever into a result set
-    for doc_id in top_documents:
-        result_by_document = results_by_document.get(doc_id)
-        if not result_by_document:
-            continue
-        
-        # Find the maximum number of matches across all retrievers for this document
-        max_matches = max(len(snippets) for snippets in result_by_document.values())
-
-        # Add results to the fused set, prioritizing by retriever order
-        for i in range(max_matches):
-            for _, snippets in result_by_document.items():
-                if i >= len(snippets):
-                    continue
-                
-                snippet = snippets[i]
-                fused_results.add(snippet)
-
-    return fused_results
+def merge_adjacent_lines(lines: List[FusedSnippet]) -> List[FusedSnippet]:
+    """Reconstruct selected lines, then order spans by their strongest line rank."""
+    priorities = {(line.uri, line.start_line): i for i, line in enumerate(lines)}
+    spans = []
+    span_priorities = []
+    for line in sorted(lines, key=lambda item: (item.uri, item.start_line)):
+        priority = priorities[line.uri, line.start_line]
+        if spans and spans[-1].uri == line.uri and spans[-1].end_line + 1 == line.start_line:
+            spans[-1].content += "\n" + line.content
+            spans[-1].end_line = line.end_line
+            spans[-1].score = max(spans[-1].score, line.score)
+            span_priorities[-1] = min(span_priorities[-1], priority)
+        else:
+            spans.append(FusedSnippet(**line.to_dict()))
+            span_priorities.append(priority)
+    return [span for _, span in sorted(zip(span_priorities, spans), key=lambda pair: pair[0])]

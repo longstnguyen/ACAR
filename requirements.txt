@@ -1,10 +1,12 @@
 nltk
 multilspy
-transformers>=4.37.0
+jedi-language-server
+transformers>=4.37.0,<5
 torch
 accelerate
 sentencepiece
 jsonlines
+tqdm
 tree_sitter==0.20.4
 tree_sitter_python
 huggingface_hub

@@ -10,8 +10,8 @@ class JaccardSimilarityRetriever:
         self,
         snippet_window_size=50,
         max_matches_per_file=20,
-        max_chunk_result=20,
-        slide=1,
+        max_chunk_result=10,
+        slide=10,
         thresh_hold=0,
         base_dir=".",
     ):
@@ -34,7 +34,7 @@ class JaccardSimilarityRetriever:
         self.identifier = "JaccardSimilarityRetriever"
 
         # Use do_retrieval method if it exists
-        if hasattr(document, "prefix"):
+        if document.prefix is not None:
             # Get target text using last_n_lines similar to jaccardRetriever.ts
             target_text = last_n_lines(document.prefix, self.snippet_window_size)
         else:
@@ -69,7 +69,7 @@ class JaccardSimilarityRetriever:
                 )
 
         matches.sort(key=lambda x: -x.score)
-        return matches
+        return matches[:self.max_chunk_result]
 
 
 if __name__ == "__main__":

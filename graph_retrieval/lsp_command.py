@@ -3,6 +3,10 @@ from multilspy import SyncLanguageServer
 from multilspy.multilspy_config import MultilspyConfig
 from multilspy.multilspy_logger import MultilspyLogger
 import os
+import atexit
+from contextlib import contextmanager, ExitStack
+from contextvars import ContextVar
+from urllib.parse import unquote, urlparse
 from schema.common import Position, Location, Range
 from schema.lsp import DocumentSymbol, ParsedHover
 from graph_retrieval.hover import extract_hover_content
@@ -10,6 +14,31 @@ from graph_retrieval.hover import extract_hover_content
 # Initialize logger and workspace
 logger = MultilspyLogger()
 workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+_workspace = ContextVar("acar_lsp_workspace", default=workspace_root)
+_servers = {}
+_server_lifetimes = ExitStack()
+atexit.register(_server_lifetimes.close)
+
+
+@contextmanager
+def use_workspace(path):
+    token = _workspace.set(os.path.abspath(path))
+    try:
+        yield
+    finally:
+        _workspace.reset(token)
+
+
+@contextmanager
+def _running_server(language=None):
+    key = (language or "python", _workspace.get())
+    if key not in _servers:
+        server = get_lsp_server(key[0])
+        _server_lifetimes.enter_context(server.start_server())
+        _servers[key] = server
+    yield _servers[key]
+
 
 # Create LSP handler function
 def get_lsp_server(language: str = "python") -> SyncLanguageServer:
@@ -23,16 +52,14 @@ def get_lsp_server(language: str = "python") -> SyncLanguageServer:
         SyncLanguageServer: An initialized language server
     """
     config = MultilspyConfig.from_dict({"code_language": language})
-    return SyncLanguageServer.create(config, logger, workspace_root)
+    return SyncLanguageServer.create(config, logger, _workspace.get())
 
-# Default LSP instance
-lsp = get_lsp_server("python")
 
 def _uri_to_file_path(uri: str) -> str:
     """Convert URI to file path."""
     # Simple conversion for file:// URIs
     if uri.startswith("file://"):
-        return uri[7:]
+        return unquote(urlparse(uri).path)
     return uri
 
 def _position_to_line_col(position: Position) -> tuple:
@@ -45,9 +72,7 @@ async def get_definition_locations(uri: str, position: Position, language: str =
 
     try:
         # Use language-specific LSP if provided
-        current_lsp = get_lsp_server(language) if language else lsp
-    
-        with current_lsp.start_server():
+        with _running_server(language) as current_lsp:
             definitions = current_lsp.request_definition(file_path, line, col)
         
         # Convert results to Location objects
@@ -76,9 +101,7 @@ async def get_implementation_locations(uri: str, position: Position, language: s
     line, col = _position_to_line_col(position)
     
     # Use language-specific LSP if provided
-    current_lsp = get_lsp_server(language) if language else lsp
-    
-    with current_lsp.start_server():
+    with _running_server(language) as current_lsp:
         implementations = current_lsp.request_implementations(file_path, line, col)
     
     # Convert results to Location objects
@@ -102,9 +125,7 @@ async def get_type_definition_locations(uri: str, position: Position, language: 
     line, col = _position_to_line_col(position)
     
     # Use language-specific LSP if provided
-    current_lsp = get_lsp_server(language) if language else lsp
-    
-    with current_lsp.start_server():
+    with _running_server(language) as current_lsp:
         type_definitions = current_lsp.request_type_definition(file_path, line, col)
     
     # Convert results to Location objects
@@ -127,9 +148,7 @@ async def get_document_symbol(uri: str, language: str = None):
     file_path = _uri_to_file_path(uri)
     
     # Use language-specific LSP if provided
-    current_lsp = get_lsp_server(language) if language else lsp
-    
-    with current_lsp.start_server():
+    with _running_server(language) as current_lsp:
         symbols = current_lsp.request_document_symbols(file_path)
     
     # Convert to a more usable format that includes location
@@ -208,9 +227,7 @@ async def get_parsed_hovers(uri: str, position: Position, symbol_name: Optional[
     line, col = _position_to_line_col(position)
     
     # Use language-specific LSP if provided
-    current_lsp = get_lsp_server(language) if language else lsp
-    
-    with current_lsp.start_server():
+    with _running_server(language) as current_lsp:
         hover_response = current_lsp.request_hover(file_path, line, col)
     # Process and return the hover response
     return extract_hover_content(hover_response)

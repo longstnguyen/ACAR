@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use ACAR, please cite the accompanying paper."
+title: "ACAR: Fast and Focused"
+type: software
+license: MIT
+repository-code: "https://github.com/longstnguyen/ACAR"
+authors: &authors
+  - family-names: Nguyen
+    given-names: Long S. T.
+  - family-names: Huynh
+    given-names: Dat T.
+  - family-names: Vo
+    given-names: Quynh T. N.
+  - family-names: Le
+    given-names: Dang
+  - family-names: Nguyen
+    given-names: Cong-Duy
+  - family-names: Luu
+    given-names: Anh Tuan
+  - family-names: Nguyen-Duc
+    given-names: Anh
+  - family-names: Quan
+    given-names: Tho T.
+preferred-citation:
+  type: conference-paper
+  authors: *authors
+  title: "Fast and Focused: Interactive Repository-Level Fill-in-the-Middle Code Completion with Hybrid Structural Retrieval"
+  collection-title: "Proceedings of the 2026 Conference on Empirical Methods in Natural Language Processing"
+  year: 2026

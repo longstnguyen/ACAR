@@ -48,8 +48,7 @@ def get_last_n_graph_context_identifiers_from_document(document: Document, posit
     # Use Python's functools.cmp_to_key to convert the comparison function for sort()
     from functools import cmp_to_key
     symbol_requests.sort(key=cmp_to_key(custom_sort))
-    
-    # Deduplicate and return the top n results
+
     return symbol_requests[:n]
 
 
@@ -64,12 +63,7 @@ def get_last_n_graph_context_identifiers_from_string(n: int, uri: str, language_
     end_pos = (len(lines) - 1, len(lines[-1]) if lines else 0)
 
     # Use the TreeSitterAnalyzer.analyze_source method
-    # Make sure we're using the right language analyzer
-    if language_id != analyzer.language_string:
-        # If a different language is needed, create a new analyzer instance
-        current_analyzer = TreeSitterAnalyzer(language_string=language_id)
-    else:
-        current_analyzer = analyzer
+    current_analyzer = TreeSitterAnalyzer(language_string=language_id)
 
     function_calls = current_analyzer.analyze_source(
         source_code=source,
@@ -106,7 +100,8 @@ def get_last_n_graph_context_identifiers_from_string(n: int, uri: str, language_
     
     # Use Python's functools.cmp_to_key to convert the comparison function for sort()
     from functools import cmp_to_key
-    symbol_requests.sort(key=cmp_to_key(custom_sort))
+    symbol_requests.sort(key=lambda request: (request.position.line, request.position.character),
+                         reverse=prioritize != "head")
     
     # Deduplicate and return the top n results
     return symbol_requests[:n]

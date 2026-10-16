@@ -41,5 +41,6 @@ class LSPSymbolContextSnippet:
             'uri': self.uri,
             'start_line': self.start_line,
             'end_line': self.end_line,
-            'symbol': self.symbol
+            'symbol': self.symbol,
+            'content': self.content
         }

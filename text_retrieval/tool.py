@@ -13,13 +13,13 @@ def read_code(fname):
 
 def iterate_repository(base_dir = '', repo = 'test', target_file = None):
     pattern = os.path.join(f'{base_dir}/{repo}', "**", "*.py")
-    files = glob.glob(pattern, recursive=True)
+    files = sorted(glob.glob(pattern, recursive=True))
 
     skipped_files = []
     result = []
     for fname in files:
         try:
-            if target_file and target_file == fname:
+            if target_file and os.path.realpath(target_file) == os.path.realpath(fname):
                 continue
             code = read_code(fname)
             document = Document(uri=fname, language_id="python", text=code)

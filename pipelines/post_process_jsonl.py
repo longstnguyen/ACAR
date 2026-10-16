@@ -7,6 +7,8 @@ from post_processing.main import parse_and_truncate_completion, process_completi
 from context.handle_current_context import get_current_doc_context
 
 def process_single_data(base_dir, data):
+    if data.get("error") or data.get("choices", [{}])[0].get("text", "").startswith("ERROR:"):
+        raise ValueError("Resolve the generation error before post-processing")
 
     language_id = "python"
     file_path = os.path.join(base_dir, *data["metadata"]["fpath_tuple"])
