@@ -4,7 +4,7 @@
 <defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#e6e3d9" stroke-width="1"/></pattern></defs>
 <rect x="2" y="2" width="1196" height="316" rx="16" fill="#fbf9f1" stroke="#deddd5" stroke-width="2"/>
 <rect x="16" y="16" width="1168" height="288" fill="url(#grid)" opacity=".58"/>
-<path d="M24 92H64V52H204V72H244V232H214V272H54V232H24Z" fill="#e2f1e9"/>
+<path d="M24 92H64V52H204V72H244V232H244V272H44V232H24Z" fill="#e2f1e9"/>
 <path d="M946 62H1126V82H1176V242H1136V272H976V242H946Z" fill="#ebe5f4"/>
 <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
 <text x="600" y="49" fill="#55746b" font-size="12" font-weight="700" letter-spacing="3">RETRIEVE · FUSE · COMPLETE</text>
@@ -563,7 +563,7 @@
 <rect x="180" y="190" width="16" height="19" fill="#42695d"/>
 <rect x="180" y="190" width="12" height="15" fill="#b3dfc4"/>
 </g><text x="145" y="213" text-anchor="middle" font-family="monospace" font-size="24" font-weight="bold" fill="#786593">{ }</text>
-<text x="143" y="265" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#577368">a little context goes a long way</text>
+<text x="144" y="255" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#577368">a little context goes a long way</text>
 <g shape-rendering="crispEdges">
 <rect x="982" y="101" width="170" height="129" fill="#c9bddc"/>
 <rect x="976" y="95" width="170" height="129" fill="#77618f"/>
