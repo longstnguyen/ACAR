@@ -1,6 +1,5 @@
 import re
 
-from schema.common import Position
 from programming_language import get_language_config, ProgrammingLanguage
 
 BRACKET_PAIR = {"(": ")", "[": "]", "{": "}", "<": ">"}
@@ -49,16 +48,6 @@ def get_first_line(text: str):
     return text[:first_lf]
 
 
-def get_until_non_empty_line(text: str):
-    lines = text.splitlines()
-    result = ""
-    for line in lines:
-        result += line + "\n"
-        if line.strip():
-            break
-    return result.rstrip("\n")
-
-
 def get_until_non_empty_line_dynamic(text: str, language_id):
     lines = text.splitlines()
     result = ""
@@ -85,38 +74,6 @@ def check_bracket_in_new_line(text: str, language_id):
     language_config = get_language_config(language_id)
     if lines[-1].strip() == language_config.get("block_start"):
         return True
-
-    return False
-
-
-def should_include_closing_line(prefix_indentation_with_first_completion_line, suffix):
-    include_closing_line_based_on_brackets = (
-        should_include_closing_line_based_on_brackets(
-            prefix_indentation_with_first_completion_line, suffix
-        )
-    )
-
-    start_indent = indentation(prefix_indentation_with_first_completion_line)
-    next_non_empty_line = get_next_non_empty_line(suffix)
-
-    return (
-        indentation(next_non_empty_line) < start_indent
-        or include_closing_line_based_on_brackets
-    )
-
-
-def should_include_closing_line_based_on_brackets(
-    prefix_indentation_with_first_completion_line, suffix
-):
-    matches = re.findall(
-        OPENING_BRACKET_REGEX, prefix_indentation_with_first_completion_line
-    )
-
-    if matches:
-        opening_bracket = matches[0]
-        closing_bracket = BRACKET_PAIR.get(opening_bracket)
-
-        return bool(opening_bracket) and suffix.startswith(closing_bracket)
 
     return False
 
@@ -232,19 +189,3 @@ def collapse_duplicative_whitespace(prefix: str, completion: str) -> str:
 
 def lines(text: str):
     return re.split(r"\r?\n", text)
-
-
-def get_position_after_text_insertion(position: Position, text: str = ""):
-    if not text:
-        return position
-
-    inserted_lines = lines(text)
-
-    if len(inserted_lines) <= 1:
-        updated_position = position.translate(0, max(len(get_first_line(text)), 0))
-    else:
-        updated_position = Position(
-            position.line + len(inserted_lines) - 1, len(inserted_lines[-1])
-        )
-
-    return updated_position

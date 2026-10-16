@@ -5,29 +5,6 @@ from programming_language import NODE_LANGUAGE
 from tree_sitter_local.tree_sitter_local import TreeSitterAnalyzer
 
 
-def parse_origin_document(context):
-    document = context["document"]
-    language_id = document["language_id"]
-
-    parser = TreeSitterAnalyzer(language_string=language_id)
-
-    tree = parser.safe_parse(document["text"])
-    if not tree:
-        return None
-
-    return tree
-
-
-def get_nodes_for_line(tree, line_number):
-    def traverse(node):
-        if node.start_point[0] == line_number:
-            yield node
-        for child in node.children:
-            yield from traverse(child)
-
-    return list(traverse(tree.root_node))
-
-
 def parse_completion(context):
     completion = context["completion"]
     document = context["document"]

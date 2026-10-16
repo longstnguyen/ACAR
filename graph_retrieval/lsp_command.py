@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from multilspy import SyncLanguageServer
 from multilspy.multilspy_config import MultilspyConfig
 from multilspy.multilspy_logger import MultilspyLogger
@@ -8,8 +8,6 @@ from contextlib import contextmanager, ExitStack
 from contextvars import ContextVar
 from urllib.parse import unquote, urlparse
 from schema.common import Position, Location, Range
-from schema.lsp import DocumentSymbol, ParsedHover
-from graph_retrieval.hover import extract_hover_content
 
 # Initialize logger and workspace
 logger = MultilspyLogger()
@@ -94,140 +92,3 @@ async def get_definition_locations(uri: str, position: Position, language: str =
     except Exception as e:
         print(f"Error getting definition locations: {e}")
         return []
-
-
-async def get_implementation_locations(uri: str, position: Position, language: str = None) -> List[Location]:
-    file_path = _uri_to_file_path(uri)
-    line, col = _position_to_line_col(position)
-    
-    # Use language-specific LSP if provided
-    with _running_server(language) as current_lsp:
-        implementations = current_lsp.request_implementations(file_path, line, col)
-    
-    # Convert results to Location objects
-    locations = []
-    for impl_loc in implementations or []:
-        loc = Location(
-            uri=_uri_to_file_path(impl_loc.get('uri', uri)),
-            range=Range(
-                start=Position(line=impl_loc.get('range', {}).get('start', {}).get('line', 0), 
-                               character=impl_loc.get('range', {}).get('start', {}).get('character', 0)),
-                end=Position(line=impl_loc.get('range', {}).get('end', {}).get('line', 0), 
-                             character=impl_loc.get('range', {}).get('end', {}).get('character', 0))
-            )
-        )
-        locations.append(loc)
-    
-    return locations
-
-async def get_type_definition_locations(uri: str, position: Position, language: str = None) -> List[Location]:
-    file_path = _uri_to_file_path(uri)
-    line, col = _position_to_line_col(position)
-    
-    # Use language-specific LSP if provided
-    with _running_server(language) as current_lsp:
-        type_definitions = current_lsp.request_type_definition(file_path, line, col)
-    
-    # Convert results to Location objects
-    locations = []
-    for type_def_loc in type_definitions or []:
-        loc = Location(
-            uri=_uri_to_file_path(type_def_loc.get('uri', uri)),
-            range=Range(
-                start=Position(line=type_def_loc.get('range', {}).get('start', {}).get('line', 0), 
-                               character=type_def_loc.get('range', {}).get('start', {}).get('character', 0)),
-                end=Position(line=type_def_loc.get('range', {}).get('end', {}).get('line', 0), 
-                             character=type_def_loc.get('range', {}).get('end', {}).get('character', 0))
-            )
-        )
-        locations.append(loc)
-    
-    return locations
-
-async def get_document_symbol(uri: str, language: str = None):
-    file_path = _uri_to_file_path(uri)
-    
-    # Use language-specific LSP if provided
-    with _running_server(language) as current_lsp:
-        symbols = current_lsp.request_document_symbols(file_path)
-    
-    # Convert to a more usable format that includes location
-    document_symbols = []
-    for symbol in symbols[0] or []:
-        # Handle the actual multilspy document symbol format
-        if 'range' in symbol and 'name' in symbol:
-            # Create a DocumentSymbol object
-            symbol_obj = DocumentSymbol(
-                name=symbol.get('name', ''),
-                kind=symbol.get('kind', 0),
-                location=Location(
-                    uri=_uri_to_file_path(uri),
-                    range=Range(
-                        start=Position(
-                            line=symbol.get('range', {}).get('start', {}).get('line', 0),
-                            character=symbol.get('range', {}).get('start', {}).get('character', 0)
-                        ),
-                        end=Position(
-                            line=symbol.get('range', {}).get('end', {}).get('line', 0),
-                            character=symbol.get('range', {}).get('end', {}).get('character', 0)
-                        )
-                    )
-                )
-            )
-            document_symbols.append(symbol_obj)
-    
-    return document_symbols
-
-async def get_text_from_location(location: Location) -> str:
-    """Fetch text from a given location."""
-    file_path = _uri_to_file_path(location.uri)
-    
-    # Read the file and extract the relevant text
-    try:
-        with open(file_path, 'r') as file:
-            lines = file.readlines()
-            
-        start_line = location.range.start.line
-        start_char = location.range.start.character
-        end_line = location.range.end.line
-        end_char = location.range.end.character
-        
-        if start_line == end_line:
-            return lines[start_line][start_char:end_char]
-        else:
-            text = lines[start_line][start_char:]
-            for line_num in range(start_line + 1, end_line):
-                text += lines[line_num]
-            text += lines[end_line][:end_char]
-            return text
-    except Exception as e:
-        print(f"Error reading file {file_path}: {e}")
-        return ""
-
-async def get_lines_from_location(location: Location, line_count: int) -> str:
-    """Fetch a specified number of lines from a given location."""
-    file_path = _uri_to_file_path(location.uri)
-    
-    try:
-        with open(file_path, 'r') as file:
-            lines = file.readlines()
-            
-        start_line = location.range.start.line
-        end_line = min(start_line + line_count, len(lines))
-        
-        return ''.join(lines[start_line:end_line])
-    except Exception as e:
-        print(f"Error reading file {file_path}: {e}")
-        return ""
-
-
-async def get_parsed_hovers(uri: str, position: Position, symbol_name: Optional[str] = None, language: str = None) -> List[ParsedHover]:
-    """Get parsed hover information for a position."""
-    file_path = _uri_to_file_path(uri)
-    line, col = _position_to_line_col(position)
-    
-    # Use language-specific LSP if provided
-    with _running_server(language) as current_lsp:
-        hover_response = current_lsp.request_hover(file_path, line, col)
-    # Process and return the hover response
-    return extract_hover_content(hover_response)

@@ -230,25 +230,3 @@ def find_block_start(language_id, prefix, current_line_prefix, cursor_position):
             }
 
     return {"multiline_trigger": None, "multiline_trigger_position": None, "line": None}
-
-
-def is_python_end_block_scope(
-    language_id, prefix, current_line_prefix, position, next_non_empty_line
-):
-    line_start_block = find_block_start(
-        language_id,
-        prefix,
-        current_line_prefix,
-        position,
-    )["line"]
-    if line_start_block is None:
-        return False
-
-    if (
-        indentation(current_line_prefix)
-        > indentation(line_start_block)
-        >= indentation(next_non_empty_line)
-    ):
-        return True
-
-    return False

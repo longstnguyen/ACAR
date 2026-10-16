@@ -1,19 +1,5 @@
 from dataclasses import dataclass
-from schema.common import Location
-from typing import Optional
 
-@dataclass
-class ParsedHover:
-    """Parsed hover information."""
-    text: str = ""
-    kind: Optional[str] = None
-
-# A simple DocumentSymbol class for our needs
-@dataclass
-class DocumentSymbol:
-    name: str
-    kind: int
-    location: Location
 @dataclass
 class LSPSymbolContextSnippet:
     """Symbol context snippet for autocomplete."""

@@ -6,18 +6,6 @@ from .identifiers import get_last_n_graph_context_identifiers_from_document
 from schema.common import Document, Position
 from .symbol_context_snippets import get_symbol_context_snippets
 
-SUPPORTED_LANGUAGES = {
-    "python",
-    "go",
-    "javascript",
-    "javascriptreact",
-    "typescript",
-    "typescriptreact",
-    "java",
-    "kotlin",
-}
-
-RECURSION_LIMIT = 3
 IDENTIFIERS_TO_RESOLVE = 1
 
 

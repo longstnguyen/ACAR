@@ -30,10 +30,3 @@ class Document:
     suffix: Optional[str] = None
     offset: Optional[int] = None
     position: Optional[Position] = None
-
-@dataclass
-class AutocompleteSymbolContextSnippet:
-    content: str
-    uri: str
-    start_line: int
-    end_line: int
