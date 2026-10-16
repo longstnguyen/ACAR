@@ -31,8 +31,11 @@ This repository contains retrieval modules, FIM prompt templates, inference help
 
 ## Method
 
+ACAR builds lexical and structural retrieval spaces, combines their evidence for the insertion point, and refines the generated code to fit its surroundings.
+
 <p align="center">
 <a href="docs/assets/architecture.pdf"><img src="docs/assets/architecture.png" alt="ACAR framework: repository indexing, lexical and structural retrieval, line-level fusion, FIM generation, and syntax-aware post-processing." width="100%"></a>
+  <br><sub>ACAR framework: repository indexing, hybrid retrieval, line-level fusion, and syntax-aware completion.</sub>
 </p>
 
 | Stage | Purpose | Entry point |
@@ -332,6 +335,8 @@ Measured on an AMD EPYC 7V13 with 24 allocated CPU cores, an NVIDIA A100 80 GB, 
 
 ## Findings
 
+The benchmark comparisons and ablations show where repository evidence helps, how retrieval and refinement contribute, and how those gains vary across backbones and completion tasks. The main findings are summarized below.
+
 - **Hybrid retrieval improves completion quality.** At Qwen2.5-Coder-3B, ACAR gains **6.73 EM points** on ReccEval and **4.46** on aggregate CrossCodeEval over the strongest retrieval baseline. Across the two main Qwen scales, it leads **5 of 6** RepoEval settings for each metric.
 
 - **Lexical and structural evidence complement each other.** ReccEval EM at 3B reaches **42.98** with both branches, compared with **39.24** for text-only and **38.49** for graph-only. All three variants use the same post-processing.
@@ -374,6 +379,8 @@ Absolute EM points, from the paper's Backbone Scaling Results appendix. CrossCod
 </details>
 
 ## Adapting ACAR
+
+To evaluate a new repository or benchmark, prepare an incomplete source snapshot and describe each insertion with the JSONL schema below. Begin with a small sample to check retrieval and completion boundaries before scaling up.
 
 ### 1. Prepare repository files and completion records
 
@@ -475,6 +482,8 @@ docs/assets/                 Pixel banner and original framework figure
 
 ### Troubleshooting
 
+Use the checks below to trace common setup, retrieval, and scoring issues to the relevant part of the pipeline.
+
 | Symptom | Check |
 | :--- | :--- |
 | Empty lexical context | Check `--base_dir`, `fpath_tuple[0]`, and the Python source files beneath that root. |
@@ -506,8 +515,8 @@ Code is released under the [MIT License](LICENSE), copyright © 2026 Long S. T. 
 
 ## References
 
-[1] Fengji Zhang et al. [RepoCoder: Repository-Level Code Completion Through Iterative Retrieval and Generation](https://aclanthology.org/2023.emnlp-main.151/). EMNLP, 2023.
+[1] Fengji Zhang, Bei Chen, Yue Zhang, Jacky Keung, Jin Liu, Daoguang Zan, Yi Mao, Jian-Guang Lou, and Weizhu Chen, “[RepoCoder: Repository-Level Code Completion Through Iterative Retrieval and Generation](https://aclanthology.org/2023.emnlp-main.151/)”, in _Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing_, Singapore, pages 2471–2484, December 2023.
 
-[2] Wei Cheng, Yuhan Wu, and Wei Hu. [Dataflow-Guided Retrieval Augmentation for Repository-Level Code Completion](https://aclanthology.org/2024.acl-long.431/). ACL, 2024.
+[2] Wei Cheng, Yuhan Wu, and Wei Hu, “[Dataflow-Guided Retrieval Augmentation for Repository-Level Code Completion](https://aclanthology.org/2024.acl-long.431/)”, in _Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)_, Bangkok, Thailand, pages 7957–7977, August 2024.
 
-[3] Yangruibo Ding et al. [CrossCodeEval: A Diverse and Multilingual Benchmark for Cross-File Code Completion](https://github.com/amazon-science/cceval). NeurIPS Datasets and Benchmarks, 2023.
+[3] Yangruibo Ding, Zijian Wang, Wasi Uddin Ahmad, Hantian Ding, Ming Tan, Nihal Jain, Murali Krishna Ramanathan, Ramesh Nallapati, Parminder Bhatia, Dan Roth, and Bing Xiang, “[CrossCodeEval: A Diverse and Multilingual Benchmark for Cross-File Code Completion](https://github.com/amazon-science/cceval)”, in _Proceedings of the 37th International Conference on Neural Information Processing Systems_, New Orleans, Louisiana, United States, 2023.
