@@ -33,7 +33,3 @@ def iterate_repository(base_dir = '', repo = 'test', target_file = None):
         for fname, e in skipped_files:
             print(f"{fname}: {e}")
     return result
-
-if __name__ == "__main__":
-    result = iterate_repository()
-    print(result)

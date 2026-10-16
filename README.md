@@ -119,7 +119,7 @@ python -m scripts.build_prompts \
   --output result/demo/hybrid_prompts.jsonl
 ```
 
-`--base_dir` supplies the source root for both target-file lookup and lexical retrieval. The builder uses the selected Qwen tokenizer to fit 2,048 tokens of retrieved context within an 8,000-token prompt. It preserves input fields and adds `prompt`, `contexts`, and token counts. Use the same `--model` checkpoint for prompt construction and generation.
+`--base_dir` supplies the source root for both target-file lookup and lexical retrieval. The builder uses the selected backbone tokenizer to fit 2,048 tokens of retrieved context within an 8,000-token prompt. It preserves input fields and adds `prompt`, `contexts`, and token counts. Use the same `--model` checkpoint for prompt construction and generation.
 
 ### 2. Generate an insertion
 
@@ -168,6 +168,7 @@ Configure batch runs through the CLI and retrieval through Python constructors.
 | Setting | Current value / interface | Location |
 | :--- | :--- | :--- |
 | Lexical corpus root | `--base_dir`; `ACAR_BASE_DIR` is the direct `ContextMixer()` fallback | [`context_mixer.py`](context_mixer.py) |
+| Prompt format | `--prompt-template qwen2.5`; see the formats below | [`prompt/fim_utils.py`](prompt/fim_utils.py) |
 | Target file root | Required `--base_dir` | [`scripts/build_prompts.py`](scripts/build_prompts.py) |
 | Query and candidate windows | 50 lines | [`JaccardSimilarityRetriever`](text_retrieval/jaccard_retriever.py) |
 | Sliding step | 10 lines | `JaccardSimilarityRetriever(slide=...)` |
@@ -181,9 +182,20 @@ Configure batch runs through the CLI and retrieval through Python constructors.
 | Generation | Up to 48 tokens; temperature 0.2; top-k 5 | `QwenInference.process_file()` |
 
 <details>
-<summary>FIM templates and SAFIM workflow</summary>
+<summary>Choose a backbone prompt or a SAFIM adapter</summary>
 
-[`prompt/fim_utils.py`](prompt/fim_utils.py) defines Qwen2.5, earlier Qwen, DeepSeek, StarCoder, Code Llama, CodeGemma, and plain left-context templates. The batch prompt builder selects `CodeQwen25PromptExtractor`; changing templates requires selecting the appropriate extractor in the caller and using a compatible model.
+Select the checkpoint tokenizer with `--model` and its prompt format with `--prompt-template`. Available formats are `qwen2.5` (default), `qwen`, `deepseek`, `starcoder`, `codellama`, `codegemma`, and `plain` (left context). For example, build DeepSeek prompts with:
+
+```bash
+python -m scripts.build_prompts \
+  --base_dir examples/repository \
+  --input result/demo/prompts.jsonl \
+  --output result/demo/deepseek_prompts.jsonl \
+  --model deepseek-ai/deepseek-coder-1.3b-instruct \
+  --prompt-template deepseek
+```
+
+Pair these prompts with the corresponding backbone's generation runner and stop tokens. The [Qwen workflow](#run-with-a-model) uses `qwen2.5`. Custom formats can be registered in `PROMPT_EXTRACTORS` in [`prompt/fim_utils.py`](prompt/fim_utils.py).
 
 For SAFIM-format generations, use the separate adapter:
 
@@ -218,9 +230,9 @@ Counts follow the paper's Benchmark Statistics appendix. RepoEval's eight reposi
 
 Use the original distributions and their evaluation instructions:
 
-- [1] [RepoEval / RepoCoder](https://github.com/microsoft/CodeT/tree/main/RepoCoder): completion records and repository-level evaluation resources.
-- [2] [ReccEval / DraCo](https://github.com/nju-websoft/DraCo/tree/main/ReccEval): Python source archives and completion metadata.
-- [3] [CrossCodeEval](https://github.com/amazon-science/cceval): multilingual completion records and repository acquisition instructions.
+- [RepoEval / RepoCoder](https://github.com/microsoft/CodeT/tree/main/RepoCoder) [1]: completion records and repository-level evaluation resources.
+- [ReccEval / DraCo](https://github.com/nju-websoft/DraCo/tree/main/ReccEval) [2]: Python source archives and completion metadata.
+- [CrossCodeEval](https://github.com/amazon-science/cceval) [3]: multilingual completion records and repository acquisition instructions.
 
 The download helper fetches the configured archives into `datasets/RepoEval`, `datasets/ReccEval`, and `datasets/CrossCodeEval`:
 
@@ -419,7 +431,7 @@ Extend ACAR through the modules below and connect each implementation at its cal
 | :--- | :--- | :--- |
 | New lexical retriever | [`text_retrieval/`](text_retrieval), [`ContextMixer`](context_mixer.py) | Implement `identifier` and async `retrieve(document, position, repo)`. Return snippets with URI, content, line span, and `to_dict()`, then register the instance in `self.retrievers`. |
 | Ranking or context selection | [`fuse_results`](ranking/reciprocal_rank_fusion.py), `ContextMixer.get_context()` | Preserve candidate order, define line identities and tie-breaking, and apply a budget before prompt serialization. |
-| Another FIM backbone | [`FIMModelSpecificPromptExtractor`](prompt/fim_utils.py) | Implement the model's special-token format and snippet serialization, select the extractor in the prompt builder, and pair it with its tokenizer and generation helper. |
+| Another FIM backbone | [`FIMModelSpecificPromptExtractor`](prompt/fim_utils.py) | Implement the special-token format and snippet serialization, register the class in `PROMPT_EXTRACTORS`, and select it with `--prompt-template` alongside the matching tokenizer and generation helper. |
 | Another source language | [`programming_language/`](programming_language), [`tree_sitter_local/`](tree_sitter_local), [`graph_retrieval/`](graph_retrieval), [`text_retrieval/tool.py`](text_retrieval/tool.py) | Add syntax queries and node types, language-server support, file extensions, and language-aware batch records. Test symbol resolution and insertion boundaries together. |
 | Another dataset schema | [`pipelines/prompt_builder.py`](pipelines/prompt_builder.py), [`pipelines/post_process_jsonl.py`](pipelines/post_process_jsonl.py) | Convert to the documented record schema and preserve IDs, prefixes, suffixes, coordinates, and references through inference. |
 | Another metric | [`scripts/evaluate.py`](scripts/evaluate.py) | Add scoring with explicit normalization and failure handling; report the denominator and aggregation unit. |
@@ -429,7 +441,6 @@ Extend ACAR through the modules below and connect each implementation at its cal
 Install the relevant requirements, then run the focused checks:
 
 ```bash
-python -m unittest discover -s tests -v
 python -m scripts.demo --output-dir result/dev-check
 python -m scripts.evaluate --input result/dev-check/refined.jsonl
 python -m scripts.build_prompts --help
@@ -437,7 +448,7 @@ python -m scripts.post_process_jsonl --help
 python -m scripts.post_process_safim --help
 ```
 
-The `test/` directory contains small repository fixtures for symbol resolution. The `tests/` directory contains automated checks. The CPU demo covers retrieval, prompt construction, and refinement together.
+The CPU demo covers retrieval, prompt construction, and refinement together.
 
 <details>
 <summary>Code structure</summary>
@@ -457,8 +468,6 @@ programming_language/        Language-specific syntax settings
 pipelines/                   JSONL and SAFIM workflows
 scripts/                     CLI wrappers, demo, scoring, and downloads
 examples/                    Small Python repository for the quickstart
-test/                        Existing symbol-resolution fixtures
-tests/                       Automated checks
 docs/assets/                 Pixel banner and original framework figure
 ```
 

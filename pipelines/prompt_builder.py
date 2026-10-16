@@ -6,11 +6,10 @@ import jsonlines
 from tqdm import tqdm
 from functools import lru_cache
 from pathlib import Path
-from prompt.fim_utils import CodeQwen25PromptExtractor
+from prompt.fim_utils import get_prompt_extractor
 
 from prompt.budget import fit_local_context, select_context_lines, serialize_context, token_count
 
-prompt_extractor = CodeQwen25PromptExtractor()
 
 
 @lru_cache(maxsize=4)
@@ -20,8 +19,10 @@ def get_tokenizer(model_name):
 
 
 def process_single_data(base_dir, data, context_mixer=None, tokenizer=None,
-                        model_name="Qwen/Qwen2.5-Coder-0.5B", context_budget=2048, input_budget=8000):
+                        model_name="Qwen/Qwen2.5-Coder-0.5B", context_budget=2048, input_budget=8000,
+                        prompt_template="qwen2.5"):
     context_mixer = context_mixer if context_mixer is not None else ContextMixer(base_dir=base_dir)
+    prompt_extractor = get_prompt_extractor(prompt_template)
     language_id = "python"
     file_path = os.path.join(base_dir, *data["metadata"]["fpath_tuple"])
 
@@ -48,12 +49,13 @@ def process_single_data(base_dir, data, context_mixer=None, tokenizer=None,
     prompt = prompt_extractor.get_infilling_prompt(filename, intro, prefix, suffix)
     return {**data, 'prompt': prompt, 'contexts': [span.to_dict() for span in contexts['context']],
             'prompt_tokens': token_count(tokenizer, prompt),
-            'context_tokens': token_count(tokenizer, intro), 'tokenizer': model_name}
+            'context_tokens': token_count(tokenizer, intro), 'tokenizer': model_name,
+            'prompt_template': prompt_template}
 
 
 
 def process_jsonl_file(base_dir, input_file, output_file, model_name="Qwen/Qwen2.5-Coder-0.5B",
-                       context_budget=2048, input_budget=8000):
+                       context_budget=2048, input_budget=8000, prompt_template="qwen2.5"):
     tokenizer = get_tokenizer(model_name)
     results = []
     context_mixer = ContextMixer(base_dir=base_dir)
@@ -64,7 +66,8 @@ def process_jsonl_file(base_dir, input_file, output_file, model_name="Qwen/Qwen2
         for data in tqdm(reader, desc="Processing data"):
             try:
                 result = process_single_data(base_dir, data, context_mixer=context_mixer, tokenizer=tokenizer,
-                                             model_name=model_name, context_budget=context_budget, input_budget=input_budget)
+                                             model_name=model_name, context_budget=context_budget, input_budget=input_budget,
+                                             prompt_template=prompt_template)
                 results.append(result)
             except Exception as e:
                 print(f"Error processing data: {e}")

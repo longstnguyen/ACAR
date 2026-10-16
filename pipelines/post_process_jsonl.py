@@ -3,7 +3,8 @@ import os
 import jsonlines
 from tqdm import tqdm
 import argparse
-from post_processing.main import parse_and_truncate_completion, process_completion
+from post_processing.parse_and_truncate_completion import parse_and_truncate_completion
+from post_processing.process_inline_completion import process_completion
 from context.handle_current_context import get_current_doc_context
 
 def process_single_data(base_dir, data):

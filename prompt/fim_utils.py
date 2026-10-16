@@ -7,8 +7,7 @@ class FIMModelSpecificPromptExtractor(ABC):
         pass
 
     def file_snippet_to_prompt_string(self, snippet):
-        # empty function
-        pass
+        return self.get_context_prompt(snippet["uri"], snippet["content"])
 
     @abstractmethod
     def get_infilling_prompt(self, filename: str, intro: str, prefix: str, suffix: str):
@@ -78,3 +77,22 @@ class DefaultModelPromptExtractor(FIMModelSpecificPromptExtractor):
 
 def get_default_context_prompt(filename: str, content: str):
     return f"Here is a reference snippet of code from {filename}:\n\n{content}"
+
+
+PROMPT_EXTRACTORS = {
+    "qwen2.5": CodeQwen25PromptExtractor,
+    "qwen": CodeQwenPromptExtractor,
+    "deepseek": DeepSeekPromptExtractor,
+    "starcoder": StarcoderPromptExtractor,
+    "codellama": CodeLlamaPromptExtractor,
+    "codegemma": CodeGemmaPromptExtractor,
+    "plain": DefaultModelPromptExtractor,
+}
+
+
+def get_prompt_extractor(template="qwen2.5"):
+    """Select an explicit format independently of the tokenizer checkpoint."""
+    try:
+        return PROMPT_EXTRACTORS[template]()
+    except KeyError as error:
+        raise ValueError(f"Unknown prompt template: {template}. Choose from {', '.join(PROMPT_EXTRACTORS)}") from error

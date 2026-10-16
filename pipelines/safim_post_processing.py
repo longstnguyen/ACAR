@@ -2,7 +2,8 @@ from schema.common import Document, Position
 import os
 import jsonlines
 from tqdm import tqdm
-from post_processing.main import parse_and_truncate_completion, process_completion
+from post_processing.parse_and_truncate_completion import parse_and_truncate_completion
+from post_processing.process_inline_completion import process_completion
 from context.handle_current_context import get_current_doc_context
 from pipelines.process_data import load_dataset
 

@@ -50,24 +50,3 @@ class LsptRetriever:
         except (OSError, RuntimeError) as error:
             logging.getLogger(__name__).warning("Structural retrieval unavailable: %s", error)
             return []
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    retrieval = LsptRetriever()
-    document = Document(
-        uri="test/test.py",
-        language_id="python",
-        text="""
-from .import_test import another_call
-def example():
-    print("Hello")
-    another_call()
-    """.strip(),
-    )
-    asyncio.run(
-        retrieval.retrieve(
-            document=document, position=Position(line=3, character=17), repo="test"
-        )
-    )

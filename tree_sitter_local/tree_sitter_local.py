@@ -214,36 +214,3 @@ class TreeSitterAnalyzer:
             ):
                 return call
         return None
-
-
-if __name__ == "__main__":
-    # Example usage
-    analyzer = TreeSitterAnalyzer(language_string="python")
-
-    # Example source code
-    source = """
-def example():
-    print("Hello")
-    my_function(arg1, 
-                arg2)
-    another_call()
-    """
-
-    # Analyze source code
-    calls = analyzer.analyze_source(source)
-
-    # Print results
-    print("Found function calls:")
-    for call in calls:
-        print(f"\nFunction: {call.name}")
-        print(
-            f"Location: Line {call.start_line + 1}, Char {call.start_char} to Line {call.end_line + 1}, Char {call.end_char}"
-        )
-        print(f"Content: {call.content}")
-
-    # Test position lookup
-    position_call = analyzer.get_function_at_position(
-        source, 3, 5
-    )  # Should find my_function
-    if position_call:
-        print(f"\nFound function at position: {position_call.name}")

@@ -96,28 +96,3 @@ def get_derived_doc_context(params):
         "multiline_trigger": multiline_info.get("multiline_trigger"),
         "multiline_trigger_position": multiline_info.get("multiline_trigger_position"),
     }
-
-
-if __name__ == "__main__":
-
-    document = Document(
-        uri="test/test.py",
-        language_id="python",
-        text="""
-from .import_test import another_call
-def example():
-    print("Hello")
-    another_call()
-def another_call2():
-    """.strip(),
-        complete_prefix="""
-from .import_test import another_call
-def example():
-    print("Hello")
-    another_call()
-def another_call2():
-    """.strip(),
-        complete_suffix="""    """.strip(),
-        position=Position(line=5, character=4),
-    )
-    print(get_current_doc_context(document, "python"))

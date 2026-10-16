@@ -70,27 +70,3 @@ class JaccardSimilarityRetriever:
 
         matches.sort(key=lambda x: -x.score)
         return matches[:self.max_chunk_result]
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    # Test document with prefix for jaccard matching
-    test_document = Document(
-        uri="test/test.py",
-        text="""from .import_test import another_call
-def example():
-    print("Hello")
-    another_call()
-    """.strip(),
-        language_id="python",
-    )
-
-    # Path to repository for testing
-    repo_path = "test"
-
-    retriever = JaccardSimilarityRetriever()
-
-    result = asyncio.run(retriever.retrieve(document=test_document, repo="test"))
-
-    print(result)

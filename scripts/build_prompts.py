@@ -1,4 +1,5 @@
 import argparse
+from prompt.fim_utils import PROMPT_EXTRACTORS
 
 
 def main() -> None:
@@ -9,6 +10,7 @@ def main() -> None:
     parser.add_argument("--input", type=str, required=True)
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--model", default="Qwen/Qwen2.5-Coder-0.5B", help="Tokenizer checkpoint")
+    parser.add_argument("--prompt-template", choices=tuple(PROMPT_EXTRACTORS), default="qwen2.5")
     parser.add_argument("--context-budget", type=int, default=2048)
     parser.add_argument("--input-budget", type=int, default=8000)
     args = parser.parse_args()
@@ -18,7 +20,8 @@ def main() -> None:
     from pipelines.prompt_builder import process_jsonl_file
 
     process_jsonl_file(args.base_dir, args.input, args.output, model_name=args.model,
-                       context_budget=args.context_budget, input_budget=args.input_budget)
+                       context_budget=args.context_budget, input_budget=args.input_budget,
+                       prompt_template=args.prompt_template)
 
 
 if __name__ == "__main__":
