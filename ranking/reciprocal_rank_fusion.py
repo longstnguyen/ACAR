@@ -20,7 +20,7 @@ class FusedSnippet:
 def fuse_results(retrieved_sets: Iterable, ranking_identities: Callable) -> List[FusedSnippet]:
     """Return ranked lines; each branch contributes only its best containing rank.
 
-    Inputs must be ordered rankings, despite the legacy argument name.
+    Each item in retrieved_sets must be an ordered ranking.
     Ties retain first-seen order, with lines within a snippet in source order.
     """
     evidence = {}

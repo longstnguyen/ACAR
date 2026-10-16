@@ -14,9 +14,13 @@ def run(output_dir):
 
     base = Path("examples/repository")
     source = base / "shop/cart.py"
-    prefix = "from pricing import discounted_total\n\n\ndef checkout(price, quantity, discount):\n    return "
+    prefix = (
+        "from pricing import discounted_total\n\n\n"
+        "def checkout(price, quantity, discount):\n"
+        "    return "
+    )
     suffix = "\n"
-    # An explicit fixture exercises refinement without claiming model inference.
+    # The fixture includes an extra function to exercise AST truncation.
     reference = "discounted_total(price, quantity, discount)"
     raw = reference + "\n\ndef unrelated():\n    pass"
     record = {
@@ -56,14 +60,18 @@ def run(output_dir):
     for name, data in [("prompts", prompt_record), ("raw", raw_record), ("refined", refined)]:
         (output / (name + ".jsonl")).write_text(json.dumps(data) + "\n", encoding="utf-8")
     print("ACAR | lexical retrieval + syntax-aware refinement")
-    print("Mode: CPU example; fixed completion fixture; no model or LSP")
+    print("Mode: CPU example with a fixed completion fixture")
     print("Target: shop/cart.py:5")
     print(f"Retrieved: {len(snippets)} snippet(s)")
     for snippet in snippets:
         print(f"  {Path(snippet.uri).relative_to(base)} | lines {snippet.start_line + 1}-{snippet.end_line + 1}")
     print("Prompt: Qwen2.5-Coder FIM with retrieved context")
-    print("Raw fixture: " + repr(raw))
-    print("Refined: " + repr(refined["choices"][0]["text"]))
+    print("Raw fixture:")
+    for line in raw.splitlines():
+        print("  " + line if line else "")
+    print("Refined:")
+    for line in refined["choices"][0]["text"].splitlines():
+        print("  " + line if line else "")
     print("Output: " + str(output))
     return refined
 

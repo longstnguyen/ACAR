@@ -50,7 +50,7 @@ Line-level reciprocal rank fusion (RRF) rewards evidence supported by both retri
 
 ## Quickstart
 
-Run commands from the repository root. The CPU example uses Python 3.9+ and the pinned Tree-sitter 0.20.4 API. It downloads the NLTK stopword list on first use and runs on a CPU.
+Run commands from the repository root. The CPU example uses Python 3.9+ and the pinned Tree-sitter 0.20.4 API. It downloads the NLTK stopword list on first use.
 
 ### 1. Install the example dependencies
 
@@ -89,13 +89,18 @@ python -m scripts.evaluate --input result/demo/refined.jsonl
 
 ```text
 ACAR | lexical retrieval + syntax-aware refinement
-Mode: CPU example; fixed completion fixture; no model or LSP
+Mode: CPU example with a fixed completion fixture
 Target: shop/cart.py:5
 Retrieved: 1 snippet(s)
   shop/pricing.py | lines 1-4
 Prompt: Qwen2.5-Coder FIM with retrieved context
-Raw fixture: 'discounted_total(price, quantity, discount)\n\ndef unrelated():\n    pass'
-Refined: 'discounted_total(price, quantity, discount)'
+Raw fixture:
+  discounted_total(price, quantity, discount)
+
+  def unrelated():
+      pass
+Refined:
+  discounted_total(price, quantity, discount)
 Output: result/demo
 ```
 
@@ -335,7 +340,7 @@ Measured on an AMD EPYC 7V13 with 24 allocated CPU cores, an NVIDIA A100 80 GB, 
 
 ## Findings
 
-The benchmark comparisons and ablations show where repository evidence helps, how retrieval and refinement contribute, and how those gains vary across backbones and completion tasks. The main findings are summarized below.
+The benchmark comparisons and ablations show how retrieval, refinement, and backbone capacity affect completion quality.
 
 - **Hybrid retrieval improves completion quality.** At Qwen2.5-Coder-3B, ACAR gains **6.73 EM points** on ReccEval and **4.46** on aggregate CrossCodeEval over the strongest retrieval baseline. Across the two main Qwen scales, it leads **5 of 6** RepoEval settings for each metric.
 
@@ -393,22 +398,30 @@ examples/repository/
     └── pricing.py
 ```
 
-Each JSONL line describes one insertion. The minimal record for the bundled example is:
+Each JSONL line describes one insertion. Construct and serialize the bundled example as follows:
 
-```json
-{
-  "prefix": "from pricing import discounted_total\n\n\ndef checkout(price, quantity, discount):\n    return ",
-  "suffix": "\n",
-  "groundtruth": "discounted_total(price, quantity, discount)",
-  "metadata": {
-    "fpath_tuple": ["shop", "cart.py"],
-    "line_no": 4,
-    "context_start_characterno": 11
-  }
+```python
+import json
+
+prefix = (
+    "from pricing import discounted_total\n\n\n"
+    "def checkout(price, quantity, discount):\n"
+    "    return "
+)
+record = {
+    "prefix": prefix,
+    "suffix": "\n",
+    "groundtruth": "discounted_total(price, quantity, discount)",
+    "metadata": {
+        "fpath_tuple": ["shop", "cart.py"],
+        "line_no": 4,
+        "context_start_characterno": 11
+    }
 }
+print(json.dumps(record))
 ```
 
-The expanded JSON above is for readability; serialize each record onto a single line in a `.jsonl` file.
+Save each serialized record on its own line in a `.jsonl` file.
 
 | Field | Meaning |
 | :--- | :--- |
@@ -500,9 +513,13 @@ ACAR accompanies **Fast and Focused: Interactive Repository-Level Fill-in-the-Mi
 
 ```bibtex
 @inproceedings{nguyen2026acar,
-  title = {Fast and Focused: Interactive Repository-Level Fill-in-the-Middle Code Completion with Hybrid Structural Retrieval},
-  author = {Nguyen, Long S. T. and Huynh, Dat T. and Vo, Quynh T. N. and Le, Dang and Nguyen, Cong-Duy and Luu, Anh Tuan and Nguyen-Duc, Anh and Quan, Tho T.},
-  booktitle = {Proceedings of the 2026 Conference on Empirical Methods in Natural Language Processing},
+  title = {Fast and Focused: Interactive Repository-Level
+           Fill-in-the-Middle Code Completion with Hybrid Structural Retrieval},
+  author = {Nguyen, Long S. T. and Huynh, Dat T. and
+            Vo, Quynh T. N. and Le, Dang and Nguyen, Cong-Duy and
+            Luu, Anh Tuan and Nguyen-Duc, Anh and Quan, Tho T.},
+  booktitle = {Proceedings of the 2026 Conference on
+               Empirical Methods in Natural Language Processing},
   year = {2026}
 }
 ```
