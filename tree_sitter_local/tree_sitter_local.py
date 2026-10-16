@@ -1,12 +1,8 @@
-from tree_sitter import Language, Parser
+from tree_sitter import Parser
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
-import os
 
-# from tree_sitter_languages import get_language
-import tree_sitter_python as tspython
 from tree_sitter_languages import get_language
-from programming_language import ProgrammingLanguage
 
 
 @dataclass

@@ -1,4 +1,4 @@
-from typing import List, Optional, Any
+from typing import List, Optional
 from multilspy import SyncLanguageServer
 from multilspy.multilspy_config import MultilspyConfig
 from multilspy.multilspy_logger import MultilspyLogger

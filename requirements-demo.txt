@@ -2,6 +2,5 @@
 nltk>=3.9,<4
 tree_sitter==0.20.4
 tree_sitter_languages==1.10.2
-tree_sitter_python
 jsonlines
 tqdm

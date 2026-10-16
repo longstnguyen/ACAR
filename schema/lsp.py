@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from schema.common import Location, Position
+from schema.common import Location
 from typing import Optional
 
 @dataclass

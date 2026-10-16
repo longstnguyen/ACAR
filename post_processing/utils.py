@@ -248,32 +248,3 @@ def get_position_after_text_insertion(position: Position, text: str = ""):
         )
 
     return updated_position
-
-
-def messages_to_text(messages):
-    text_parts = []
-    for message in messages:
-        text = (
-            f"{message['role']} {message['content']}"
-            if message["content"] is not None
-            else message["role"]
-        )
-        text_parts.append(text)
-    return "".join(text_parts)
-
-
-def messages_to_text_langchain(messages):
-    text_parts = []
-    for message in messages:
-        text = message.content
-        text_parts.append(text)
-    return "".join(text_parts)
-
-
-BAD_COMPLETION_START = re.compile(
-    r"^([\U0001F300-\U0001FAFF]|\u200B|\+ |- |\. )+\s+", re.UNICODE
-)
-
-
-def fix_bad_completion_start(completion: str) -> str:
-    return BAD_COMPLETION_START.sub("", completion)

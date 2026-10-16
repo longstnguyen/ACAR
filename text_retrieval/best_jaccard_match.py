@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import re

@@ -1,5 +1,5 @@
 from .detect_multiline import detect_multiline
-from schema.common import Position, Document
+from schema.common import Position
 from post_processing.process_inline_completion import get_matching_suffix_length
 from post_processing.utils import (
     get_last_line,

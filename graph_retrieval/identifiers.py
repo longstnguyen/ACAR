@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from tree_sitter_local.tree_sitter_local import TreeSitterAnalyzer
 from schema.common import Position, Document
@@ -99,7 +99,6 @@ def get_last_n_graph_context_identifiers_from_string(n: int, uri: str, language_
         return -1     # a is after b, so it should come before
     
     # Use Python's functools.cmp_to_key to convert the comparison function for sort()
-    from functools import cmp_to_key
     symbol_requests.sort(key=lambda request: (request.position.line, request.position.character),
                          reverse=prioritize != "head")
     

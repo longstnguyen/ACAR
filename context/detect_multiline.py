@@ -9,7 +9,7 @@ from post_processing.utils import (
     FUNCTION_OR_METHOD_INVOCATION_REGEX,
     OPENING_BRACKET_REGEX,
 )
-from programming_language import get_language_config, ProgrammingLanguage
+from programming_language import get_language_config
 
 LANGUAGES_WITH_MULTILINE_SUPPORT = [
     "astro",

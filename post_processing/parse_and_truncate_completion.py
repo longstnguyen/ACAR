@@ -1,4 +1,3 @@
-from schema.common import Position
 from .parse_completion import parse_completion
 from .truncate_parsed_completion import truncate_parsed_completion
 

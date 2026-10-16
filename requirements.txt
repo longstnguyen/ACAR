@@ -8,7 +8,6 @@ sentencepiece
 jsonlines
 tqdm
 tree_sitter==0.20.4
-tree_sitter_python
 huggingface_hub
 pandas
 fsspec

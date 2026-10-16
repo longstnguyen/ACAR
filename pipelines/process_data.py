@@ -1,24 +1,6 @@
 import json
-from datetime import datetime
 from typing import Tuple, Union, List
 import datasets
-
-
-def get_all_repositories(folder_path, output_file):
-    import os
-
-    folders = [
-        name
-        for name in os.listdir(folder_path)
-        if os.path.isdir(os.path.join(folder_path, name))
-    ]
-
-    with open(output_file, "w") as f:
-        for folder in folders:
-            json.dump(folder, f)
-            f.write("\n")  # Ensure newline for JSONL format
-
-    print(f"Folder names written to {output_file}")
 
 
 def get_file_line_numbers(
@@ -177,7 +159,6 @@ def load_dataset(task: Union[str, List[str]] = ["block", "control", "api"]):
 
 
 if __name__ == "__main__":
-    # get_all_repositories()
     base_path = "datasets/ReccEval/Source_Code"
     input_file = "datasets/ReccEval/metadata.jsonl"
     output_file = "result/metadata.jsonl"
